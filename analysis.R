@@ -20,6 +20,8 @@ library(broom)
 library(fasterize)
 setwd("~/ClimateAnalogs/analysis")
 
+#if on original machine - load .RData from climateanalogs/analysis
+
 # read in ecoregion shapefile from 2017 paper to get lookup table
 ####################################################
 ecorgns<-st_read(dsn="Ecoregions2017shp",layer='Ecoregions2017')
@@ -127,7 +129,7 @@ sigmaNA_compare_PDF(c(-9, 20, 37, 65), "europe_sigmaNA.pdf", 1.1, 1, nationalBor
 ##check Abatzaglou mask for NA reasons
 ##################
 jmask<- raster("johnmask.nc")
-jmask <- raster(jmask, layer =0)
+
 ##############
 
 ### read in ecoregion rasters and border shp files ##
@@ -141,16 +143,19 @@ ecorgn_rast_4C<-raster("ecorgn_predict4C_ver2.tif")
 
 ##mask in black No Analog locations from rasters (where sigma >2 [0.2 in layer]) and include NAs with that were sigma >5.4
 ecorgn_rast_2C[sigma2>0.2] <- 847
+ecorgn_rast_2C[is.na(sigma2) & jmask == 2] <-847
 ecorgn_rast_4C[sigma4>0.2] <- 847
+ecorgn_rast_4C[is.na(sigma4) & jmask == 2] <-847
 
 #Mask in NA Values not over water as 848 (data issues)
 ecorgn_rast_2C[jmask==1] <- 848
 ecorgn_rast_2C[jmask==0] <- NA
-ecorgn_rast_4C[is.na(sigma4)] <- 848
+ecorgn_rast_4C[jmask==1] <- 848
+ecorgn_rast_4C[jmask==0] <- NA
 
 #write these rasters out (including the masked sigma values)
-writeRaster(ecorgn_rast_2C, "ecorast_2C_mapped.tif")
-writeRaster(ecorgn_rast_4C, "ecorast_4C_mapped.tif")
+writeRaster(ecorgn_rast_2C, "ecorast_2C_mapped.tif", overwrite=T)
+writeRaster(ecorgn_rast_4C, "ecorast_4C_mapped.tif", overwrite=T)
 
 #change LUT to include No Analogs (eco_id=847)
 LUT<- read.csv(file="LUT.csv", stringsAsFactors = F)

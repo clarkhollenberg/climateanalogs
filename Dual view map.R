@@ -108,10 +108,12 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   output$map <- renderLeaflet({
-    leaflet()  %>% addTiles() %>%
-      addRasterImage(ecorast_now_pr, colors = col_now, project = F, group = 'now') %>% 
-      addRasterImage(ecorast_2C_pr, colors = col_2C, project = F, group = '+2C') %>%
-      addRasterImage(ecorast_4C_pr, colors = col_4C, project = F, group = '+4C') %>%
+    leaflet()  %>% 
+      addTiles("https://maps.tilehosting.com/data/hillshades/{z}/{x}/{y}.png?key=KZO7rAv96Alr8UVUrd4a") %>%
+      addProviderTiles("Stamen.TonerLines") %>%
+      addRasterImage(ecorast_now_pr, colors = col_now, project = F, opacity = 0.8, group = 'now') %>% 
+      addRasterImage(ecorast_2C_pr, colors = col_2C, project = F, opacity = 0.8, group = '+2C') %>%
+      addRasterImage(ecorast_4C_pr, colors = col_4C, project = F, opacity = 0.8, group = '+4C') %>%
     addLayersControl(
        baseGroups = c('now', '+2C', '+4C'),
        options = layersControlOptions(collapsed = FALSE)
