@@ -520,7 +520,9 @@ write.csv(perc_compare_df, file='PA_perc_comparison_w4C.csv')
 
 perc_current_rast<-subs(ecorgn_rast_now, perc_current_df, by="ECO_ID",which="PA_perc_current")
 perc_2C_rast<-subs(ecorgn_rast_2C, perc_2C_df, by="ECO_ID",which="PA_perc_2C")
-perc_change_rast<-perc_2C_rast - perc_current_rast
+perc_4C_rast<-subs(ecorgn_rast_4C, perc_4C_df, by="ECO_ID",which="PA_perc_4C")
+perc_change_rast_2C<-perc_2C_rast - perc_current_rast
+perc_change_rast_4C<-perc_4C_rast - perc_current_rast
 
 ave_percByBiome<-function(datasource, colnametot, colnamePA)
 {
@@ -552,9 +554,13 @@ dev.off()
 
 #plot change in perc protected
 #####
-pdf(file="Perc_protected_change.pdf", 15, 8)
+pdf(file="Perc_protected_change.pdf", 20, 8)
+par(mfrow=c(1, 2))
 co<-colorRampPalette(c("red", "gray96", "blue"))(20)
-plot(perc_change_rast, col=co, xlim= c(-180, 180), zlim=c(-0.5, 0.5), main="+2C Change in proportion of ecoregions protected")
+plot(perc_change_rast_2C, col=co, xlim= c(-180, 180), zlim=c(-0.5, 0.5), main="+2C Change in proportion of ecoregions protected")
+legend("topleft", legend=c("No Analog"), fill=c("white"))
+plot(nationalBorders, add=TRUE, legend=FALSE)
+plot(perc_change_rast_4C, col=co, xlim= c(-180, 180), zlim=c(-0.5, 0.5), main="+4C Change in proportion of ecoregions protected")
 legend("topleft", legend=c("No Analog"), fill=c("white"))
 plot(nationalBorders, add=TRUE, legend=FALSE)
 dev.off()
