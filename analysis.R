@@ -51,12 +51,8 @@ write.csv(LUT, "LUT.csv")
 # temp2<-data.frame(LUT$ECO_ID[!(LUT$ECO_ID %in% temp$ECO_ID)])
 # colnames(temp2)<-'ECO_ID'
 # temp<-merge(temp2, LUT, by='ECO_ID')
-# #
 
-########
-
-
-## read in sigma data to evaluate no analog locations
+# read in sigma data to evaluate no analog locations
 ##################################################
 
 #sigma raster whitespace exploration##
@@ -512,11 +508,13 @@ analyzeByPerc<- function(ecorgn_rast, nameEnd)
 #creating dataframes to look at PA % changes
 perc_current_df<-analyzeByPerc(ecorgn_rast_now, 'current')
 perc_2C_df<-analyzeByPerc(ecorgn_rast_2C, '2C')
-df<-analyzeByPerc(ecorgn_rast_2C, '2C')
+perc_4C_df<-analyzeByPerc(ecorgn_rast_4C, '4C')
 perc_compare_df<-merge(perc_current_df, perc_2C_df, by=c("ECO_ID", 'econame', 'BIOME_ID', 'BIOME_NAME'))
-perc_compare_df$PA_perc_change<-perc_compare_df$PA_perc_2C - perc_compare_df$PA_perc_current
+perc_compare_df<-merge(perc_compare_df, perc_4C_df, by=c("ECO_ID", 'econame', 'BIOME_ID', 'BIOME_NAME'))
+perc_compare_df$PA_perc_change_2C<-perc_compare_df$PA_perc_2C - perc_compare_df$PA_perc_current
+perc_compare_df$PA_perc_change_4C<-perc_compare_df$PA_perc_4C - perc_compare_df$PA_perc_current
 perc_compare_df<-merge(perc_compare_df, voteMeans, by='ECO_ID')
-write.csv(perc_compare_df, file='PA_perc_comparison.csv')
+write.csv(perc_compare_df, file='PA_perc_comparison_w4C.csv')
 
 
 

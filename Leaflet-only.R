@@ -70,6 +70,7 @@ mapClicks<-function(x, y)
 
 #####################
 library(htmlwidgets)
+    df <- data.frame('x' = c(1), 'y' = c(1))
 
     leaflet() %>% 
       addTiles("https://maps.tilehosting.com/data/hillshades/{z}/{x}/{y}.png?key=KZO7rAv96Alr8UVUrd4a") %>%
@@ -81,6 +82,14 @@ library(htmlwidgets)
        baseGroups = c('now', '+2C', '+4C'),
        options = layersControlOptions(collapsed = FALSE)
           ) %>%
+      onRender("function(el, x, data) {this.on('click', function(e){
+      var coord = e.latlng;
+      var lat = coord.lat;
+      var lng = coord.lng;
+     console.log('You clicked the map at latitude: ' + lat + ' and longitude: ' + lng);
+    });
+        }
+        ", data=df) %>%
     saveWidget(file="ecoregions_map.html")
       
   
