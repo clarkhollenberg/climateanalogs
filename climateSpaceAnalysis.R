@@ -2,8 +2,8 @@ library(ncdf4)
 library(raster)
 library(dplyr)
 
-
 setwd("~/ClimateAnalogs/analysis/Terraclimate")
+
 #load in Terraclimate data -skip
 #####
 tmax<-brick('terra1961990_txx.nc')
@@ -36,19 +36,23 @@ meanRast<-brick(tmax.av, tmin.av, aet.av, def.av)
 means.df<-as.data.frame(meanRast, na.rm = TRUE)
 means_sub.df<-means.df[sample(nrow(means.df), 500000), ]
 
-
-#convert observations to standardized anomalies
-sd<-apply(means_sub.df,2, sd)
-mean<-apply(means_sub.df,2, mean)
-meansprime.df<-sweep(means_sub.df, MARGIN=2, mean,`-`) %>%
-                sweep(., MARGIN=2, sd,`/`)
-# write.csv(meansprime.df, "climMeans_prime_df.csv")
-
-
 #run PCA
-PCA <- prcomp(means_sub.df, center=T, scale=T)
-means.proj <- as.data.frame(predict(PCA,meansprime.df))
+PCA <- prcomp(means_sub.df, center=T, scale=T, rank=2)
 
-proj_sub.df<-means.proj[sample(nrow(means.proj), 2000), ]
-
+#project a test subset
+means.proj <- as.data.frame(predict(PCA,means.df[sample(nrow(means.df), 1000), ]))
 plot(proj_sub.df[,1], proj_sub.df[,2])
+
+#now lets average by ecoregion and project these into PCA space
+
+#start with the raster input
+fullmean.df<-as.data.frame(meanRast) #this time we'll keep the NAs to preserve cell number
+fullmean.df$cell_num<-c(1:(4320*8640))
+fullmeanNA.df<-fullmean.df[!is.na(fullmean.df$avetmax), ]
+fullmean.df$ECO_ID<-eco_finder(ecoRast_4C)
+
+eco_finder<-function(ecoRast_4C)
+{
+  for (i in 1:(4320*8640))
+}
+
