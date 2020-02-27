@@ -5,7 +5,8 @@ libraries = c("knitr", "shiny", "leaflet","ncdf4", "lubridate", "dplyr",
               "zoo", "ggplot2", "scales", "raster", "leafem", "leaflet.extras")
 lapply(libraries, library, character.only = TRUE)
 
-setwd("~/ClimateAnalogs/ShinyApp")
+setwd("~/ClimateAnalogs/ShinyApp") #laptop
+setwd("~/Documents/Analogs")  #desktop
 
 #reproject rasters to match leaflet projection
 #############
@@ -22,6 +23,19 @@ gdal_repro <- function(filein, fileout)
   writeRaster(out, fileout, overwrite = T)
 }
 
+#reprojections for linux
+###################################
+gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_2C_mapped.tif", 
+           "/home/clark/Documents/Analogs/InRasters/ecorast_2C_reproj.tif")
+
+gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_4C_mapped.tif", 
+           "/home/clark/Documents/Analogs/InRasters/ecorast_4C_reproj.tif")
+
+gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_now.tif", 
+           "/home/clark/Documents/Analogs/InRasters/ecorast_now_reproj.tif")
+###################
+#windows
+#################
 gdal_repro("C:/Users/clark/Documents/ClimateAnalogs/ShinyApp/ecorast_2C_mapped.tif", 
            "C:/Users/clark/Documents/ClimateAnalogs/ShinyApp/ecorast_2C_reproj.tif")
 
@@ -30,20 +44,22 @@ gdal_repro("C:/Users/clark/Documents/ClimateAnalogs/ShinyApp/ecorast_4C_mapped.t
 
 gdal_repro("C:/Users/clark/Documents/ClimateAnalogs/ShinyApp/ecoregion_raster_current_ver2.tif", 
            "C:/Users/clark/Documents/ClimateAnalogs/ShinyApp/eco_rast_now_reproj.tif")
-###################
+#################
 
 #Read in rasters and LUT
 #############
-ecorast_now = raster("ecoregion_raster_current_ver2.tif")
-ecorast_2C = raster("ecorast_2C_mapped.tif")
-ecorast_4C = raster("ecorast_4C_mapped.tif")
-ecorast_now_pr = raster("eco_rast_now_reproj.tif")
-ecorast_2C_pr<-raster('ecorast_2C_reproj.tif')
-ecorast_4C_pr<-raster('ecorast_4C_reproj.tif')
-LUT<-read.csv('LUT_plus.csv')
+ecorast_now = raster("InRasters/ecorast_now.tif")
+ecorast_2C = raster("InRasters/ecorast_2C_mapped.tif")
+ecorast_4C = raster("InRasters/ecorast_4C_mapped.tif")
+ecorast_now_pr = raster("InRasters/ecorast_now_reproj.tif")
+ecorast_2C_pr<-raster('InRasters/ecorast_2C_reproj.tif')
+ecorast_4C_pr<-raster('InRasters/ecorast_4C_reproj.tif')
+LUT<-read.csv('InRasters/LUT_plus.csv')
 
-uSAstatelines<-readOGR(dsn="C:/Users/clark/Documents/ClimateAnalogs/analysis/USA_state_shp",layer='cb_2018_us_state_5m')
-nationalBorders<-readOGR(dsn="C:/Users/clark/Documents/ClimateAnalogs/analysis/countries_shp",layer='countries')
+
+
+# uSAstatelines<-readOGR(dsn="C:/Users/clark/Documents/ClimateAnalogs/analysis/USA_state_shp",layer='cb_2018_us_state_5m')
+# nationalBorders<-readOGR(dsn="C:/Users/clark/Documents/ClimateAnalogs/analysis/countries_shp",layer='countries')
 ###############
 
 #Define colors and plotting functions
@@ -56,22 +72,20 @@ ecoColor<-function(rasterName)
   return(col_plot)
 }
 
-ecoLegend<-function(rasterName)
-{
-  df <- data.frame(unique(rasterName))
-  colnames(df)<- "ECO_ID"
-  df<-merge(df, LUT, by="ECO_ID")
-  color_palate_leg <- as.character(df$color)
-  legend_names <- as.character(df$econame)
-  df<-data.frame('Names' = legend_names, 'Color' = color_palate_leg)
-  return(df)
-}
+# ecoLegend<-function(rasterName)
+# {
+#   df <- data.frame(unique(rasterName))
+#   colnames(df)<- "ECO_ID"
+#   df<-merge(df, LUT, by="ECO_ID")
+#   color_palate_leg <- as.character(df$color)
+#   legend_names <- as.character(df$econame)
+#   df<-data.frame('Names' = legend_names, 'Color' = color_palate_leg)
+#   return(df)
+# }
 
 col_now <- ecoColor(ecorast_now)
 col_2C <- ecoColor(ecorast_2C)
-col_4C <-ecoColor(ecorast_4C)
-
-leg <- ecoLegend(ecorast_now)
+col_4C <- ecoColor(ecorast_4C)
 
 mapClicks<-function(x, y)
 {
@@ -138,18 +152,3 @@ shinyApp(ui, server)
 #simplify polygons with sf
 #reproject polygons
 #leaflet click response
-leaflet(options = leafletOptions(preferCanvas = T))
-##sandbox
-#################
-df <- data.frame('x' = -121.43188, 'y' = 38.20365)
-extract(ecorgn_rast_now, df)
-cellFromXY(ecorgn_rast_now, df)
-
-leaflet() %>% addTiles() %>%
-  addRasterImage(ecorast_2C, colors = col, project = F)
-
-leaflet() %>% addTiles() %>%
-  addRasterImage(ecorast_2C, colors = col, project = F)
-  
-     addLegend(colors = leg$Color, labels = leg$Names,
-             title = "Ecoregions")
