@@ -1,8 +1,10 @@
 library(ncdf4)
 library(raster)
 library(dplyr)
+library(scales)
 
-setwd("~/ClimateAnalogs/analysis/Terraclimate")
+setwd("~/ClimateAnalogs/analysis/Terraclimate") #laptop
+setwd("~/Documents/Analogs/ClimateSpace") 
 
 #load in Terraclimate data -skip
 #####
@@ -34,6 +36,7 @@ meanRast<-brick(tmax.av, tmin.av, aet.av, def.av)
 
 #subsample cells w/out NA
 means.df<-as.data.frame(meanRast, na.rm = TRUE)
+colnames(means.df)<-c("tmax", "tmin", "aet", "def")
 means_sub.df<-means.df[sample(nrow(means.df), 500000), ]
 
 #run PCA
@@ -43,16 +46,66 @@ PCA <- prcomp(means_sub.df, center=T, scale=T, rank=2)
 means.proj <- as.data.frame(predict(PCA,means.df[sample(nrow(means.df), 1000), ]))
 plot(proj_sub.df[,1], proj_sub.df[,2])
 
-#now lets average by ecoregion and project these into PCA space
 
+#now lets average by ecoregion and project these into PCA space
+ecorast_now <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_now.tif")
+ecorast_2C <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_2C.tif")
+ecorast_4C <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_4C.tif")
+LUT<-read.csv("LUT.csv")
+LUT$X<-NULL
 #start with the raster input
 fullmean.df<-as.data.frame(meanRast) #this time we'll keep the NAs to preserve cell number
 fullmean.df$cell_num<-c(1:(4320*8640))
-fullmeanNA.df<-fullmean.df[!is.na(fullmean.df$avetmax), ]
-fullmean.df$ECO_ID<-eco_finder(ecoRast_4C)
+fullmean.df<-fullmean.df[!is.na(fullmean.df$layer.1), ] #remove NAs
 
-eco_finder<-function(ecoRast_4C)
+#for the current condition
+fullmean.df$ECO_ID<-extract(ecorast_now, fullmean.df$cell_num) #returns current eco_ids
+fullmean.df<-fullmean.df[!is.na(fullmean.df$ECO_ID), ] #Remove the few eco_ids with NA
+aves_by_ecoregion.df<-meanByEco(fullmean.df, fullmean.df$ECO_ID) 
+colnames(aves_by_ecoregion.df)<-c("tmax", "tmin", "aet", "def", "ECO_ID")
+df<-data.frame('ECO_ID'=0:846)
+aves_by_ecoregion.df<-merge(df, aves_by_ecoregion.df, by="ECO_ID") #to sort by ecoregion
+means_now.proj<-as.data.frame(predict(PCA,aves_by_ecoregion.df[, 2:5]))
+means_now.proj$PC1<-means_now.proj$PC1*-1
+means_now.proj$ECO_ID<-aves_by_ecoregion.df$ECO_ID
+means_now.proj<-merge(means_now.proj, LUT, by="ECO_ID")
+#plot
+pdf("current_ecorgn_climate_space.pdf", 12, 8)
+plot(means_now.proj$PC1, means_now.proj$PC2, col=as.character(means_now.proj$color), pch=16, xlab="PC1 (approx. low to high energy)",
+     ylab="PC2 (approx low to high water)", main="Current Ecoregions in Climate Space")
+dev.off()
+
+#to scatter plot a subset
+sub_means.df<-fullmean.df[sample(1:nrow(fullmean.df), 10000), ]
+colnames(sub_means.df)<-c("tmax", "tmin", "aet", "def", "ECO_ID")
+sub_means.proj<-as.data.frame(predict(PCA,sub_means.df[, 1:4])) #project in PCA space and rotate first component
+sub_means.proj$PC1<-sub_means.proj$PC1*-1
+sub_means.proj$ECO_ID<-sub_means.df$ECO_ID
+sub_means.proj<-merge(sub_means.proj, LUT, by="ECO_ID")
+pdf("current_climate_space_subsample.pdf", 12, 8)
+plot(sub_means.proj$PC1, sub_means.proj$PC2, col=alpha(as.character(sub_means.proj$color), 0.8), pch=16, xlab="PC1 (approx. low to high energy)",
+     ylab="PC2 (approx low to high water)", main="10000 cells in current Climate Space")
+dev.off()
+
+#by biome
+pdf("current_climate_space_subsample_biome.pdf", 12, 8)
+plot(sub_means.proj$PC1, sub_means.proj$PC2, col=as.character(sub_means.proj$biome_color), pch=16, xlab="PC1 (approx. low to high energy)",
+     ylab="PC2 (approx low to high water)", main="10000 cells in current Climate Space")
+legend("topleft", legend=unique(LUT$BIOME_NAME), cex=0.75, fill=as.character(unique(LUT$biome_color)))
+dev.off()
+#for 2C condition
+
+  
+  
+meanByEco<-function(data, indexCol)
 {
-  for (i in 1:(4320*8640))
+  out<-data.frame()
+  for (i in unique(indexCol))
+  {
+    df<-subset(data, ECO_ID==i)
+    vec<-apply(df[, 1:4], 2, mean) %>% c(., i)
+    out<-rbind(out, vec)
+    print(i)
+  }
+  return(out)
 }
-

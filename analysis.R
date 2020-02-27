@@ -14,11 +14,12 @@ library(ncdf4)
 library(geosphere)
 library(IDPmisc)
 library(sp)
-library(sf)
-library(scales)
-library(broom)
-library(fasterize)
-setwd("~/ClimateAnalogs/analysis")
+# library(sf)
+# library(scales)
+# library(broom)
+# library(fasterize)
+setwd("~/ClimateAnalogs/analysis")  #laptop
+setwd("~/Documents/Analogs") #desktop
 
 #if on original machine - load .RData from climateanalogs/analysis
 
@@ -56,6 +57,7 @@ write.csv(LUT, "LUT.csv")
 ##################################################
 
 #sigma raster whitespace exploration##
+#############
 sigma2<- brick("analog2c_sigma.nc")
 sigma4<- brick("analog4c_sigma.nc")
 sigma2<-raster(sigma2, layer = 1)
@@ -130,18 +132,18 @@ jmask<- raster("johnmask.nc")
 
 ### read in ecoregion rasters and border shp files ##
 ################################################################
-##from online datasource ecoregions2017.appspot.com, lost some elements through rasterization
-ecorgn_rast_now<-raster("ecoregion_raster_current_ver2.tif") 
+
 
 ##load +2C rasterfile
-ecorgn_rast_2C<- raster("ecorgn_predict2C_ver2.tif")
-ecorgn_rast_4C<-raster("ecorgn_predict4C_ver2.tif")
+setwd("~/Documents/Analogs/InRasters")
+##from online datasource ecoregions2017.appspot.com, lost some elements through rasterization
+ecorgn_rast_now<-raster("ecorast_current.tif") 
+ecorgn_rast_2C<- raster("ecorast_2C.tif")
+ecorgn_rast_4C<-raster("ecorast_4C.tif")
 
-##mask in black No Analog locations from rasters (where sigma >2 [0.2 in layer]) and include NAs with that were sigma >5.4
-ecorgn_rast_2C[sigma2>0.2] <- 847
-ecorgn_rast_2C[is.na(sigma2) & jmask == 2] <-847
-ecorgn_rast_4C[sigma4>0.2] <- 847
-ecorgn_rast_4C[is.na(sigma4) & jmask == 2] <-847
+##mask in black No Analog locations from rasters (where sigma >2 [0.2 in layer]) and where we had sufficient data
+ecorgn_rast_2C[is.na(ecorgn_rast_2C) & jmask == 2] <-847
+ecorgn_rast_4C[is.na(ecorgn_rast_4C) & jmask == 2] <-847
 
 #Mask in NA Values not over water as 848 (data issues)
 ecorgn_rast_2C[jmask==1] <- 848
@@ -150,6 +152,7 @@ ecorgn_rast_4C[jmask==1] <- 848
 ecorgn_rast_4C[jmask==0] <- NA
 
 #write these rasters out (including the masked sigma values)
+setwd("~/Documents/Analogs/InRasters")
 writeRaster(ecorgn_rast_2C, "ecorast_2C_mapped.tif", overwrite=T)
 writeRaster(ecorgn_rast_4C, "ecorast_4C_mapped.tif", overwrite=T)
 
