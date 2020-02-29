@@ -26,25 +26,28 @@ def.av<-calc(def, fun=mean)
 writeRaster(def.av, "avedef.tif", format="GTiff", overwrite=T)
 #####
 
+
 tmax.av<-raster("avetmax.tif")
 tmin.av<-raster("avetmin.tif")
 aet.av<-raster("aveaet.tif")
 def.av<-raster("avedef.tif")
 #stack and convert to df
 meanRast<-brick(tmax.av, tmin.av, aet.av, def.av)
-
+#mask areas with insufficient data from analysis in current PCA (to remove rock and ice, etc)
+jmask<-raster("/home/clark/Documents/Analogs/InRasters/johnmask.nc")
+meanRast_mask<-mask(meanRast, jmask, maskvalue=1)  #to remove insufficient data areas (mostly ice and the amazon)
 
 #subsample cells w/out NA
-means.df<-as.data.frame(meanRast, na.rm = TRUE)
+means.df<-as.data.frame(meanRast_mask, na.rm = TRUE)
 colnames(means.df)<-c("tmax", "tmin", "aet", "def")
 means_sub.df<-means.df[sample(nrow(means.df), 500000), ]
 
 #run PCA
 PCA <- prcomp(means_sub.df, center=T, scale=T, rank=2)
 
-#project a test subset
-means.proj <- as.data.frame(predict(PCA,means.df[sample(nrow(means.df), 1000), ]))
-plot(proj_sub.df[,1], proj_sub.df[,2])
+# #project a test subset
+# means.proj <- as.data.frame(predict(PCA,means.df[sample(nrow(means.df), 1000), ]))
+# plot(proj_sub.df[,1], proj_sub.df[,2])
 
 
 #now lets average by ecoregion and project these into PCA space
@@ -53,24 +56,35 @@ ecorast_2C <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_2C.tif")
 ecorast_4C <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_4C.tif")
 LUT<-read.csv("LUT.csv")
 LUT$X<-NULL
-#start with the raster input
-fullmean.df<-as.data.frame(meanRast) #this time we'll keep the NAs to preserve cell number
-fullmean.df$cell_num<-c(1:(4320*8640))
-fullmean.df<-fullmean.df[!is.na(fullmean.df$layer.1), ] #remove NAs
 
-#for the current condition
-fullmean.df$ECO_ID<-extract(ecorast_now, fullmean.df$cell_num) #returns current eco_ids
-fullmean.df<-fullmean.df[!is.na(fullmean.df$ECO_ID), ] #Remove the few eco_ids with NA
-aves_by_ecoregion.df<-meanByEco(fullmean.df, fullmean.df$ECO_ID) 
-colnames(aves_by_ecoregion.df)<-c("tmax", "tmin", "aet", "def", "ECO_ID")
+
+
+
+
+#start with the raster input
+extract_ecoids<-function(inputMeanRast, ecorast)
+{
+  fullmean.df<-as.data.frame(inputMeanRast) #this time we'll keep the NAs to preserve cell number
+  fullmean.df$cell_num<-c(1:(4320*8640))
+  fullmean.df<-fullmean.df[!is.na(fullmean.df[,1]), ] #remove NA (by checking the first column
+  fullmean.df$ECO_ID<-extract(ecorast, fullmean.df$cell_num) #returns current eco_ids
+  fullmean.df<-fullmean.df[!is.na(fullmean.df$ECO_ID), ] #Remove the few eco_ids with NA
+  fullmean.df$cell_num<-NULL
+  return(fullmean.df)
+}
+
+input_now.df<- extract_ecoids(meanRast_mask, ecorast_now)
+aves_by_eco_now.df<-meanByEco(input_now.df, input_now.df$ECO_ID) 
+colnames(aves_by_eco_now.df)<-c("tmax", "tmin", "aet", "def", "ECO_ID")
 df<-data.frame('ECO_ID'=0:846)
-aves_by_ecoregion.df<-merge(df, aves_by_ecoregion.df, by="ECO_ID") #to sort by ecoregion
-means_now.proj<-as.data.frame(predict(PCA,aves_by_ecoregion.df[, 2:5]))
-means_now.proj$PC1<-means_now.proj$PC1*-1
-means_now.proj$ECO_ID<-aves_by_ecoregion.df$ECO_ID
+aves_by_eco_now.df<-merge(df, aves_by_eco_now.df, by="ECO_ID") #to sort by ecoregion
+means_now.proj<-as.data.frame(predict(PCA,aves_by_eco_now.df[, 2:5]))
+means_now.proj$PC2<-means_now.proj$PC2*-1
+means_now.proj$ECO_ID<-aves_by_eco_now.df$ECO_ID
 means_now.proj<-merge(means_now.proj, LUT, by="ECO_ID")
+
 #plot
-pdf("current_ecorgn_climate_space.pdf", 12, 8)
+pdf("current_ecorgn_climate_space_masked.pdf", 12, 8)
 plot(means_now.proj$PC1, means_now.proj$PC2, col=as.character(means_now.proj$color), pch=16, xlab="PC1 (approx. low to high energy)",
      ylab="PC2 (approx low to high water)", main="Current Ecoregions in Climate Space")
 dev.off()
@@ -95,8 +109,8 @@ legend("topleft", legend=unique(LUT$BIOME_NAME), cex=0.75, fill=as.character(uni
 dev.off()
 #for 2C condition
 
-  
-  
+
+
 meanByEco<-function(data, indexCol)
 {
   out<-data.frame()

@@ -14,6 +14,7 @@ library(ncdf4)
 library(geosphere)
 library(IDPmisc)
 library(sp)
+library(dplyr)
 # library(sf)
 # library(scales)
 # library(broom)
@@ -22,8 +23,10 @@ setwd("~/ClimateAnalogs/analysis")  #laptop
 setwd("~/Documents/Analogs") #desktop
 
 #if on original machine - load .RData from climateanalogs/analysis
-
-# read in ecoregion shapefile from 2017 paper to get lookup table
+##################################################################
+#Pre-processing
+########################################################################################################################
+# read in ecoregion shapefile from 2017 paper to get lookup table -skip and load LUT.csv
 ####################################################
 ecorgns<-st_read(dsn="Ecoregions2017shp",layer='Ecoregions2017')
 
@@ -124,37 +127,37 @@ sigmaNA_compare_PDF(c(-9, 20, 37, 65), "europe_sigmaNA.pdf", 1.1, 1, nationalBor
 
 #############################
 
-##check Abatzaglou mask for NA reasons
-##################
-jmask<- raster("johnmask.nc")
+
 
 ##############
 
-### read in ecoregion rasters and border shp files ##
+### create rasters showing insufficient data vs no analog
 ################################################################
 
 
 ##load +2C rasterfile
 setwd("~/Documents/Analogs/InRasters")
 ##from online datasource ecoregions2017.appspot.com, lost some elements through rasterization
-ecorgn_rast_now<-raster("ecorast_current.tif") 
+ecorgn_rast_now<-raster("ecorast_now.tif") 
 ecorgn_rast_2C<- raster("ecorast_2C.tif")
 ecorgn_rast_4C<-raster("ecorast_4C.tif")
 
 ##mask in black No Analog locations from rasters (where sigma >2 [0.2 in layer]) and where we had sufficient data
-ecorgn_rast_2C[is.na(ecorgn_rast_2C) & jmask == 2] <-847
-ecorgn_rast_4C[is.na(ecorgn_rast_4C) & jmask == 2] <-847
+ecorast_2C_mapped<-ecorgn_rast_2C
+ecorast_4C_mapped<-ecorgn_rast_4C
+ecorast_2C_mapped[is.na(ecorast_2C_mapped) & jmask == 2] <-847  #these are locations where there was enough data, but no analog could be found
+ecorast_4C_mapped[is.na(ecorast_4C_mapped) & jmask == 2] <-847
 
 #Mask in NA Values not over water as 848 (data issues)
-ecorgn_rast_2C[jmask==1] <- 848
-ecorgn_rast_2C[jmask==0] <- NA
-ecorgn_rast_4C[jmask==1] <- 848
-ecorgn_rast_4C[jmask==0] <- NA
+ecorast_2C_mapped[jmask==1] <- 848
+ecorast_2C_mapped[jmask==0] <- NA #these should already be NA
+ecorast_4C_mapped[jmask==1] <- 848
+ecorast_4C_mapped[jmask==0] <- NA
 
 #write these rasters out (including the masked sigma values)
 setwd("~/Documents/Analogs/InRasters")
-writeRaster(ecorgn_rast_2C, "ecorast_2C_mapped.tif", overwrite=T)
-writeRaster(ecorgn_rast_4C, "ecorast_4C_mapped.tif", overwrite=T)
+writeRaster(ecorast_2C_mapped, "ecorast_2C_mapped.tif", overwrite=T)
+writeRaster(ecorast_4C_mapped, "ecorast_4C_mapped.tif", overwrite=T)
 
 #change LUT to include No Analogs (eco_id=847)
 LUT<- read.csv(file="LUT.csv", stringsAsFactors = F)
@@ -165,18 +168,29 @@ LUT[nrow(LUT) + 1,] = c(847,"No analog", 16, "No analog", "#000000", "#000000")
 LUT[nrow(LUT) + 1,] = c(848,"Insufficient data", 17, "Insufficient data", "#FFFFFF", "#FFFFFF")
 write.csv(LUT, "LUT_plus.csv")
 
-#load majority percentage from 100 layer sigma voting
-maj_vote_rast<-raster("ecorgn_percentmaj2C.tif")
-#change values pushed to NA on the landsurface for which there was a climate analog to 1 (Solomon masked these out)
-temp<-maj_vote_rast
-temp[is.na(temp)]<-1
-temp[is.na(ecorgn_rast_2C)]<-NA
-maj_vote_rast<-temp
 
+
+
+###############################################################################################################
+#Loading input files
+######################
+ecorgn_rast_now<-raster("ecorast_now.tif") 
+ecorgn_rast_2C<- raster("ecorast_2C.tif")
+ecorgn_rast_4C<-raster("ecorast_4C.tif")
+ecorast_2C_mapped<-raster("InRasters/ecorast_2C_mapped.tif")
+ecorast_4C_mapped<-raster("InRasters/ecorast_4C_mapped.tif")
+#load majority percentage from 100 layer sigma voting
+votecount_rast_2C<-raster("ecorast_2C_votecount.tif")
+votecount_rast_4C<-raster("ecorast_4C_votecount.tif")
+##Abatzaglou mask for regions of insufficient data
+##################
+jmask<- raster("johnmask.nc")
+LUT<-read.csv("InRasters/LUT.csv", stringsAsFactors = F, encoding ='utf-8')
+LUT_plus<-read.csv("InRasters/LUT_plus.csv", stringsAsFactors = F, encoding ='utf-8')
 ##load countrylines for mapping
-nationalBorders<-readOGR(dsn="countries_shp",layer='countries')
+nationalBorders<-readOGR(dsn="InRasters/countries_shp",layer='countries')
 ##load statelines for mapping
-uSAstatelines<-readOGR(dsn="USA_state_shp",layer='cb_2018_us_state_5m')
+uSAstatelines<-readOGR(dsn="InRasters/USA_state_shp",layer='cb_2018_us_state_5m')
 ###############################################################
 
 #plotting ecoregion comparisons
@@ -188,12 +202,12 @@ plotWColors<-function(rasterName, title, leg_x=NULL, leg_y=NULL, txtsize=NULL)
 {
   df <- data.frame(unique(rasterName))
   colnames(df)<- "ECO_ID"
-  df<-merge(df, LUT, by="ECO_ID")
+  df<-merge(df, LUT_plus, by="ECO_ID")
   color_palate_leg <- as.character(df$color)
   legend_names <- as.character(df$econame)
   
   rangeValues<-c((minValue(rasterName)+1):(maxValue(rasterName)+1))
-  color_palate_plot<-as.character(LUT$color[rangeValues])
+  color_palate_plot<-as.character(LUT_plus$color[rangeValues])
   plot(rasterName, col=color_palate_plot, main = title, legend=FALSE)
 }
 
@@ -201,7 +215,7 @@ plotWColors<-function(rasterName, title, leg_x=NULL, leg_y=NULL, txtsize=NULL)
 plotByBiome<-function(rasterName, title)
 {
   rangeValues<-c((minValue(rasterName)+1):(maxValue(rasterName)+1))
-  color_palate_plot<-as.character(LUT$biome_color[rangeValues])
+  color_palate_plot<-as.character(LUT_plus$biome_color[rangeValues])
   plot(rasterName, col=color_palate_plot, main = title, legend=FALSE)
 }
 
@@ -216,7 +230,7 @@ plotLegend<-function(rasterName1, rasterName2, rasterName3, txtsize, columns)
   df<-data.frame(unique(c(df1, df2, df3)))
               
   colnames(df)<- "ECO_ID"
-  df<-merge(df, LUT, by="ECO_ID")
+  df<-merge(df, LUT_plus, by="ECO_ID")
   color_palate_leg <- as.character(df$color)
   legend_names <- as.character(df$econame)
   plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
@@ -232,11 +246,11 @@ plotBiomeLegend<-function(rasterName1, rasterName2, rasterName3, txtsize, column
   df3<-unique(rasterName3)
   df<-data.frame(unique(c(df1, df2, df3)))
   colnames(df)<- "ECO_ID"
-  df<-merge(df, LUT, by="ECO_ID")
+  df<-merge(df, LUT_plus, by="ECO_ID")
   #pull unique biomes from these ecoregions and create new LUT
   df1<-data.frame(unique(df$BIOME_ID))
   colnames(df1)<- "BIOME_ID"
-  df<-merge(df1, LUT, by="BIOME_ID")
+  df<-merge(df1, LUT_plus, by="BIOME_ID")
   #now we have the correct biomes, but need only one row per biome
   color_palate_leg <- as.character(unique(df$biome_color))
   legend_names <- as.character(unique(df$BIOME_NAME))
@@ -249,8 +263,8 @@ ecorgn_compareMap_PDF<-function(extentVector, filename, leg_txt, leg_col, border
 {
   bounds<-extent(extentVector)
   rast_current<-crop(ecorgn_rast_now, bounds)
-  rast_2C<-crop(ecorgn_rast_2C, bounds)
-  rast_4C<-crop(ecorgn_rast_4C, bounds)
+  rast_2C<-crop(ecorast_2C_mapped, bounds)
+  rast_4C<-crop(ecorast_4C_mapped, bounds)
   rast_borders<-crop(borderShp, bounds)
   
   pdf(file= filename, 28, 8)
@@ -271,8 +285,8 @@ biome_compareMap_PDF<-function(extentVector, filename, leg_txt, leg_col, borderS
 {
   bounds<-extent(extentVector)
   rast_current<-crop(ecorgn_rast_now, bounds)
-  rast_2C<-crop(ecorgn_rast_2C, bounds)
-  rast_4C<-crop(ecorgn_rast_4C, bounds)
+  rast_2C<-crop(ecorast_2C_mapped, bounds)
+  rast_4C<-crop(ecorast_4C_mapped, bounds)
   rast_borders<-crop(borderShp, bounds)
   
   pdf(file= filename, 25, 8)
@@ -335,20 +349,20 @@ drawDispVectors<-function(rasterName, extentVector)
 }
 
 #applying the functions to generate ecorgn_comparison plots
-ecorgn_compareMap_PDF(c(-125, -105, 32, 49), "westrnUSA_ecorgns.pdf", 1.1, 2, uSAstatelines)
-ecorgn_compareMap_PDF(c(-170, -140, 55, 75), "alaska_ecorgns.pdf", 1, 2, nationalBorders)
-ecorgn_compareMap_PDF(c(-70, -53, -15, 5), "amazon_ecorgns.pdf", 1, 2, nationalBorders)
-ecorgn_compareMap_PDF(c(-9, 20, 37, 65), "europe_ecorgns.pdf", 0.9, 1, nationalBorders)
-ecorgn_compareMap_PDF(c(80, 110, 25, 45), "asia_ecorgns.pdf", 0.8, 2, nationalBorders)
-ecorgn_compareMap_PDF(c(10, 40, -10, 25), "congo_ecorgns.pdf", 0.9, 2, nationalBorders)
+ecorgn_compareMap_PDF(c(-125, -105, 32, 49), "Figures/westrnUSA_ecorgns.pdf", 1.1, 2, uSAstatelines)
+ecorgn_compareMap_PDF(c(-170, -140, 55, 75), "Figures/alaska_ecorgns.pdf", 1, 2, nationalBorders)
+ecorgn_compareMap_PDF(c(-70, -53, -15, 5), "Figures/amazon_ecorgns.pdf", 1, 2, nationalBorders)
+ecorgn_compareMap_PDF(c(-9, 20, 37, 65), "Figures/europe_ecorgns.pdf", 0.9, 1, nationalBorders)
+ecorgn_compareMap_PDF(c(80, 110, 25, 45), "Figures/asia_ecorgns.pdf", 0.8, 2, nationalBorders)
+ecorgn_compareMap_PDF(c(10, 40, -10, 25), "Figures/congo_ecorgns.pdf", 0.9, 2, nationalBorders)
 
 #applying for biome comparison plots
-biome_compareMap_PDF(c(-125, -105, 32, 49), "westrnUSA_biomes.pdf", 2, 1, uSAstatelines)
-biome_compareMap_PDF(c(-170, -140, 55, 75), "alaska_biomes.pdf", 2, 1, nationalBorders)
-biome_compareMap_PDF(c(-70, -53, -15, 5), "amazon_biomes.pdf", 1.5, 1, nationalBorders)
-biome_compareMap_PDF(c(-9, 20, 37, 65), "europe_biomes.pdf", 2, 1, nationalBorders)
-biome_compareMap_PDF(c(80, 110, 25, 45), "asia_biomes.pdf", 1, 1, nationalBorders)
-biome_compareMap_PDF(c(10, 40, -10, 25), "congo_biomes.pdf", 1.1, 1, nationalBorders)
+biome_compareMap_PDF(c(-125, -105, 32, 49), "Figures/westrnUSA_biomes.pdf", 2, 1, uSAstatelines)
+biome_compareMap_PDF(c(-170, -140, 55, 75), "Figures/alaska_biomes.pdf", 2, 1, nationalBorders)
+biome_compareMap_PDF(c(-70, -53, -15, 5), "Figures/amazon_biomes.pdf", 1.5, 1, nationalBorders)
+biome_compareMap_PDF(c(-9, 20, 37, 65), "Figures/europe_biomes.pdf", 2, 1, nationalBorders)
+biome_compareMap_PDF(c(80, 110, 25, 45), "Figures/asia_biomes.pdf", 1, 1, nationalBorders)
+biome_compareMap_PDF(c(10, 40, -10, 25), "Figures/congo_biomes.pdf", 1.1, 1, nationalBorders)
 
 #maps with arrows from current to 2C
 create_ecorgn_movementMap_PDF(c(-125, -105, 32, 49), 'westrnUSA_ecorgn_movement.pdf', 1.15, 1, uSAstatelines)
@@ -362,23 +376,25 @@ create_ecorgn_movementMap_PDF(c(-9, 20, 37, 65), "europe_ecorgns_movement.pdf", 
 #working with majority vote%
 ###########################
 
-meanVotePerc<-function()
+meanVotePerc<-function(rasterName)
 {
   vec<-vector()
-  for (i in unique(ecorgn_rast_2C))
+  for (i in unique(rasterName))
   {
-    temp<-maj_vote_rast
-    temp[ecorgn_rast_2C != i]<-NA
+    temp<-votecount_rast_2C
+    temp[rasterName != i]<-NA
     tempy<-cellStats(temp, stat='mean', na.rm=TRUE)
     vec<-c(vec, tempy)
     print(i)
   }
-  out<-data.frame('ECO_ID' = unique(ecorgn_rast_2C), 'Mean_vote_perc' = vec)
+  out<-data.frame('ECO_ID' = unique(rasterName), 'Mean_vote_perc' = vec)
   return(out)
 }
-voteMeans<-meanVotePerc()
+voteMeans_2C<-meanVotePerc(ecorgn_rast_2C)
+voteMeans_4C<-meanVotePerc(ecorgn_rast_4C)
 
-
+write.csv(voteMeans_2C, "Outputs/voteMeans_2C.csv", row.names = F)
+write.csv(voteMeans_4C, "Outputs/voteMeans_2C.csv", row.names = F)
 
 ecorgn_vote_compareMap_PDF<-function(extentVector, filename, leg_txt, leg_col, borderShp)
 {
@@ -411,20 +427,20 @@ ecorgn_vote_compareMap_PDF(c(-9, 20, 37, 65), "europe_votingMap.pdf", 1.1, 1, na
 
 #determine where ecoregions are changing globally (where the ECO_ID changes between rasters)
 #######################################################
-ecorgn_rast_change <- ecorgn_rast_2C - ecorgn_rast_now
+ecorgn_rast_change_2C <- ecorgn_rast_2C - ecorgn_rast_now
+ecorgn_rast_change_4C <- ecorgn_rast_4C - ecorgn_rast_now
 
 ###Maps of ecoregion shift as binary
 #####
-ecorgn_rast_change_bin<-ecorgn_rast_change
-ecorgn_rast_change_bin[ecorgn_rast_change_bin[]>0 | ecorgn_rast_change_bin[]<0]<- 1
-rm(ecorgn_rast_change)
+ecorgn_rast_change_2C[ecorgn_rast_change_2C[]>0 | ecorgn_rast_change_2C[]<0]<- 1
+ecorgn_rast_change_4C[ecorgn_rast_change_4C[]>0 | ecorgn_rast_change_4C[]<0]<- 1
 
 #create map of binary ecoregion change, overlaid with protected areas
 areas_ecoregion_change_PDF<-function(extentVector, filename, leg_txt, borderShp)
 {
   bounds<-extent(extentVector)
   #Use ecorgn_rast_now to get a gray background for the land surface (ensuring that NA data on the land isn't plotted as white)
-  rast_bg<-crop(sigma_NA_bin, bounds)
+  rast_bg<-crop(jmask, bounds)
   rast_change<-crop(ecorgn_rast_change_bin, bounds)
   rast_PA<-crop(PA_bin, bounds)
   rast_borders<-crop(borderShp, bounds)
@@ -449,14 +465,19 @@ areas_ecoregion_change_PDF(c(-9, 20, 37, 65), "europe_ecorgns_change.pdf", 2, na
 
 #global plot ecoregion shift
 #################
-pdf(file="global_ecorgns_change.pdf", 18, 10)
-plot(sigma_NA_bin, col=c("light grey", "light grey"), main = "Areas of ecoregion change +2C", legend=FALSE)
+pdf(file="global_ecorgns_change.pdf", 22, 10)
+par(mfrow=c(1, 2))
+plot(ecorgn_rast_change_2C, col=c("light grey", "red"), main = "Areas of ecoregion change +2C", legend=FALSE)
 legend("topleft", legend=c("Ecoregion static", "Ecoregion shift", "Protected areas", "Protected Areas with shift"), cex=1, 
        ncol = 1, fill=c("light grey", "red", "yellow", "orange"))
-plot(ecorgn_rast_change_bin, col=c("light grey", "red"),
-     legend=FALSE, add=TRUE)
 plot(PA_bin, col=alpha("yellow", 0.6), legend=FALSE, add=TRUE)
-# plot(nationalBorders, bg="transparent", add=TRUE)
+plot(nationalBorders, bg="transparent", add=TRUE)
+
+plot(ecorgn_rast_change_4C, col=c("light grey", "red"), main = "Areas of ecoregion change +4C", legend=FALSE)
+legend("topleft", legend=c("Ecoregion static", "Ecoregion shift", "Protected areas", "Protected Areas with shift"), cex=1, 
+       ncol = 1, fill=c("light grey", "red", "yellow", "orange"))
+plot(PA_bin, col=alpha("yellow", 0.6), legend=FALSE, add=TRUE)
+plot(nationalBorders, bg="transparent", add=TRUE)
 #plot images
 dev.off()
 #####################################
@@ -464,7 +485,8 @@ dev.off()
 #analyze percent protected changes
 ##############################################
 
-PA<-raster("~/ClimateAnalogs/analysis/PA/PA.IVInoass.r.GTE75perc_2019-12-23.tif")
+PA<-raster("~/ClimateAnalogs/analysis/PA/PA.IVInoass.r.GTE75perc_2019-12-23.tif") #laptop
+PA<-raster("PA_rast.tif") 
 
 # convert to binary image
 PA_bin <- PA
