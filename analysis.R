@@ -21,6 +21,7 @@ library(dplyr)
 # library(fasterize)
 setwd("~/ClimateAnalogs/analysis")  #laptop
 setwd("~/Documents/Analogs") #desktop
+load("Documents/Analogs/.RData")
 
 #if on original machine - load .RData from climateanalogs/analysis
 ##################################################################
