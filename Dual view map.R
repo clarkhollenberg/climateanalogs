@@ -2,7 +2,7 @@
 ##Clark Hollenberg
 
 libraries = c("knitr", "shiny", "leaflet","ncdf4", "lubridate", "dplyr",
-              "zoo", "ggplot2", "scales", "raster", "leafem", "leaflet.extras")
+              "zoo", "ggplot2", "scales", "raster", "leaflet.extras")
 lapply(libraries, library, character.only = TRUE)
 
 setwd("~/ClimateAnalogs/ShinyApp") #laptop
@@ -31,8 +31,8 @@ gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_2C_mapped.tif",
 gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_4C_mapped.tif", 
            "/home/clark/Documents/Analogs/InRasters/ecorast_4C_reproj.tif")
 
-gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_now.tif", 
-           "/home/clark/Documents/Analogs/InRasters/ecorast_now_reproj.tif")
+gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_now_mapped.tif", 
+           "/home/clark/Documents/Analogs/InRasters/ecorast_now_map_reproj.tif")
 ###################
 #windows
 #################
@@ -48,10 +48,10 @@ gdal_repro("C:/Users/clark/Documents/ClimateAnalogs/ShinyApp/ecoregion_raster_cu
 
 #Read in rasters and LUT
 #############
-ecorast_now = raster("InRasters/ecorast_now.tif")
+ecorast_now = raster("InRasters/ecorast_now_mapped.tif")
 ecorast_2C = raster("InRasters/ecorast_2C_mapped.tif")
 ecorast_4C = raster("InRasters/ecorast_4C_mapped.tif")
-ecorast_now_pr = raster("InRasters/ecorast_now_reproj.tif")
+ecorast_now_pr = raster("InRasters/ecorast_now_map_reproj.tif")
 ecorast_2C_pr<-raster('InRasters/ecorast_2C_reproj.tif')
 ecorast_4C_pr<-raster('InRasters/ecorast_4C_reproj.tif')
 LUT<-read.csv('InRasters/LUT_plus.csv')
