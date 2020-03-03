@@ -33,6 +33,9 @@ gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_4C_mapped.tif",
 
 gdal_repro("/home/clark/Documents/Analogs/InRasters/ecorast_now_mapped.tif", 
            "/home/clark/Documents/Analogs/InRasters/ecorast_now_map_reproj.tif")
+
+gdal_repro("/home/clark/Documents/Analogs/InRasters/NAareadifference.tif", 
+           "/home/clark/Documents/Analogs/InRasters/NAdiff_reproj.tif")
 ###################
 #windows
 #################
@@ -56,8 +59,8 @@ ecorast_2C_pr<-raster('InRasters/ecorast_2C_reproj.tif')
 ecorast_4C_pr<-raster('InRasters/ecorast_4C_reproj.tif')
 LUT<-read.csv('InRasters/LUT_plus.csv')
 
-
-
+NAdiff<-raster("InRasters/NAdiff_reproj.tif")
+jmask_pr<-raster("InRasters/johnmask_reproj.tif")
 # uSAstatelines<-readOGR(dsn="C:/Users/clark/Documents/ClimateAnalogs/analysis/USA_state_shp",layer='cb_2018_us_state_5m')
 # nationalBorders<-readOGR(dsn="C:/Users/clark/Documents/ClimateAnalogs/analysis/countries_shp",layer='countries')
 ###############
@@ -83,6 +86,8 @@ ecoColor<-function(rasterName)
 #   return(df)
 # }
 
+ind<-unique(ecorast_now)+1
+col_now<-as.character(LUT$color[ind])
 col_now <- ecoColor(ecorast_now)
 col_2C <- ecoColor(ecorast_2C)
 col_4C <- ecoColor(ecorast_4C)
@@ -128,8 +133,10 @@ server <- function(input, output) {
       addRasterImage(ecorast_now_pr, colors = col_now, project = F, opacity = 0.8, group = 'now') %>% 
       addRasterImage(ecorast_2C_pr, colors = col_2C, project = F, opacity = 0.8, group = '+2C') %>%
       addRasterImage(ecorast_4C_pr, colors = col_4C, project = F, opacity = 0.8, group = '+4C') %>%
-    addLayersControl(
-       baseGroups = c('now', '+2C', '+4C'),
+      addRasterImage(NAdiff, colors=c("red", "white", "blue"), project = F, opacity = 0.8, group = 'NA') %>%
+      addRasterImage(jmask_pr, colors=c("white", "red", "blue"), project = F, opacity = 0.8, group = 'jmask') %>%
+      addLayersControl(
+       baseGroups = c('now', '+2C', '+4C', 'NA', 'jmask'),
        options = layersControlOptions(collapsed = FALSE)
           )
   })

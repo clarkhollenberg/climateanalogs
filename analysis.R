@@ -62,8 +62,8 @@ write.csv(LUT, "LUT.csv")
 
 #sigma raster whitespace exploration##
 #############
-sigma2<- brick("analog2c_sigma.nc")
-sigma4<- brick("analog4c_sigma.nc")
+sigma2<- brick("InRasters/analog2c_sigma.nc")
+sigma4<- brick("InRasters/analog4c_sigma.nc")
 sigma2<-raster(sigma2, layer = 1)
 sigma4<-raster(sigma4, layer = 1)
 
@@ -80,9 +80,10 @@ plot(temp, legend = F, col=c('light gray', 'red'), main = "+2C Locations with si
 plot(tempy, legend = F, col=c('light gray', 'red'), main = "+4C Locations with sigma > 2 (No analog)")
 dev.off()
 
-temp<-raster(sigma4, layer = 1)
-temp[temp>0.2]=1
-temp[temp<0.2]=0
+temp<-sigma4
+temp[is.na(sigma4)]<-1  # this line gets those spots where sigma>5.4
+temp[sigma4>0.2]=1
+temp[jmask!=2]=0  #only include regions where we did analysis
 pdf('No_analog_4C.pdf', 16, 8)
 plot(temp, legend = F, col=c('gray96', 'red'), main = "+4C Locations with sigma > 2 (No analog)")
 dev.off()
@@ -157,10 +158,22 @@ ecorast_4C_mapped[jmask==0] <- NA
 
 ecorast_now_mapped<-ecorgn_rast_now  #mask areas of insufficient data in the current (to allow for more direct comparison)
 ecorast_now_mapped[jmask==1] <- 848
-writeRaster(ecorast_now_mapped, "InRasters/ecorast_now_mapped.tif", overwrite=T)
+ecorast_now_mapped[jmask==0] <- NA
+
+#correct for some strange masking difference
+temp<-ecorast_now_mapped
+temp[]<-0
+temp[is.na(ecorast_now_mapped)]=1
+temp2<-ecorast_now_mapped
+temp2[]<-0
+temp2[is.na(ecorast_2C_mapped)]=1
+tempy<-temp-temp2  #this holds areas where ecorast_now is NA but the 2C/4C is not (they should be the same)
+ecorast_2C_mapped[tempy==1]<-NA
+ecorast_4C_mapped[tempy==1]<-NA
 
 #write these rasters out (including the masked sigma values)
-setwd("~/Documents/Analogs/InRasters")
+setwd("~/Documents/Analogs")
+writeRaster(ecorast_now_mapped, "ecorast_now_mapped.tif", overwrite=T)
 writeRaster(ecorast_2C_mapped, "ecorast_2C_mapped.tif", overwrite=T)
 writeRaster(ecorast_4C_mapped, "ecorast_4C_mapped.tif", overwrite=T)
 
