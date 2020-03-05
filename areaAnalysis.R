@@ -81,7 +81,7 @@ biomeArea.df$noAnalog_2C<-tapply(noAnalogSum$noAnalog_2C,noAnalogSum$BIOME_ID,FU
 biomeArea.df$noAnalog_4C<-tapply(noAnalogSum$noAnalog_4C,noAnalogSum$BIOME_ID,FUN = sum)
 colnames(biomeArea.df)<-c("Area_now", "Area_2C", "Area_4C", "noAnalog_2C", "noAnalog_4C")
 biomeArea.df$BIOME_ID<-rownames(biomeArea.df)
-LUT_biome<-data.frame("BIOME_ID"=LUT_plus$BIOME_ID, "BIOME_NAME"=LUT_plus$BIOME_NAME)
+LUT_biome<-data.frame("BIOME_ID"=LUT_plus$BIOME_ID, "BIOME_NAME"=LUT_plus$BIOME_NAME, "BIOME_COLOR"=LUT_plus$biome_color)
 LUT_biome<-unique(LUT_biome)
 biomeArea.df<-merge(biomeArea.df, LUT_biome, by="BIOME_ID")
 write.csv(biomeArea.df, "Outputs/Biome_area_base.csv", row.names = F)
@@ -104,49 +104,96 @@ biomeArea.df$Area_2C[8]/sum(biomeArea.df$Area_2C)
 #generate input data for chord diagram
 ######################################
 
-calc_flowArea<-function(fromRaster, toRaster)
+#run this on Cortana for ecoregion rasters
+###!!!make sure to adjust length if you are running by biome or ecoregion (both in the for loop and the conditional)
+calc_flowArea<-function(fromRaster, toRaster, biome=F)
 {
-  arr<-array()
-  for (i in 0:4)
+
+  if (biome)
   {
-    #for each ecoregion in the fromRaster, determine where the area goes to in the toRaster
-    temp_bin<-toRaster
-    temp_bin[fromRaster!=i]=NA
-    area<-tapply(area(temp_bin), temp_bin[], sum)
-    fullarea<-as.array(rep(NA, 849))
-    names(fullarea)<-as.character(seq(0, 848, 1))
-    fullarea[names(area)]<-area
-    if (i==0)
+    for (i in 1:16) #ignore insuff. data (biome==17)
     {
-      arr<-fullarea
+      #for each ecoregion in the fromRaster, determine where the area goes to in the toRaster
+      temp_bin<-toRaster
+      temp_bin[fromRaster!=i]=NA
+      area<-tapply(raster::area(temp_bin), temp_bin[], sum)
+      fullarea<-as.array(rep(NA, 16))
+      names(fullarea)<-as.character(seq(1, 16, 1))
+      fullarea[names(area)]<-area
+      if (i==1)
+      {
+        arr<-fullarea
+      }
+      else
+      {
+        arr<-rbind(arr, fullarea)
+      }
+      print(i)
     }
-    else
-    {
-      arr<-rbind(arr, fullarea)
-    }
-    print(i)
   }
+  else
+  {
+    for (i in 0:847) #ignore insuff. data (ecoid==848)
+    {
+      #for each ecoregion in the fromRaster, determine where the area goes to in the toRaster
+      temp_bin<-toRaster
+      temp_bin[fromRaster!=i]=NA
+      area<-tapply(raster::area(temp_bin), temp_bin[], sum)
+      fullarea<-as.array(rep(NA, 848)) #848 to include 0 index
+      names(fullarea)<-as.character(seq(0, 847, 1))
+      fullarea[names(area)]<-area
+      if (i==0)
+      {
+        arr<-fullarea
+      }
+      else
+      {
+        arr<-rbind(arr, fullarea)
+      }
+      print(i)
+    }
+  }
+ 
   return(arr)
 }
-temp<-calc_flowArea(ecorast_now_mapped, ecorast_2C_mapped)
 
-temp_bin<-ecorast_2C_mapped
-temp_bin[ecorast_now_mapped!=2]=NA
-area<-tapply(area(temp_bin), temp_bin[], sum)
-fullarea<-as.array(rep(NA, 849))
-names(fullarea)<-as.character(seq(0, 848, 1))
-fullarea[names(area)]<-area
-temp<-rbind(area2, area)
-temp<-tapply(area(ecorast_now_mapped), ecorast_now_mapped[], sum)
-
-biorast_now_mapped<-ecorast_now_mapped
-biorast_now_mapped<-calc(ecorast_now_mapped, fun=ecotobiome)
-
+#generate biomeid based rasters
 ecotobiome<-function(x)
 {
-  df<-subset(LUT_plus, ECO_ID ==x)
-  return(as.numeric(df$BIOME_ID))
+  return(LUT_plus$BIOME_ID[x+1])
 }
+biorast_now_mapped<-calc(ecorast_now_mapped, fun=ecotobiome)
+biorast_2C_mapped<-calc(ecorast_2C_mapped, fun=ecotobiome)
+biorast_4C_mapped<-calc(ecorast_4C_mapped, fun=ecotobiome)
+
+#calculate matrix showing biome area fluxes
+biome_2C_flow_matrix<-calc_flowArea(biorast_now_mapped, biorast_2C_mapped, biome=T)
+biome_4C_flow_matrix<-calc_flowArea(biorast_now_mapped, biorast_4C_mappedbiome=T)
+rownames(biome_2C_flow_matrix)<-colnames(biome_2C_flow_matrix)
+rownames(biome_4C_flow_matrix)<-colnames(biome_4C_flow_matrix)
+write.csv(biome_2C_flow_matrix, "Outputs/biome_2C_flow_matrix.csv")
+write.csv(biome_4C_flow_matrix, "Outputs/biome_4C_flow_matrix.csv")
+
+#flows within/between protected areas
+PA_eco_now<-mask(ecorast_now_mapped, PA_bin)
+PA_eco_2C<-mask(ecorast_2C_mapped, PA_bin)
+PA_eco_4C<-mask(ecorast_4C_mapped, PA_bin)
+PA_eco_2C_flowMatrix<-calc_flowArea(PA_eco_now, PA_eco_2C)
+PA_eco_4C_flowMatrix<-calc_flowArea(PA_eco_now, PA_eco_4C)
+
+#local area flows - try western us
+local_flowCalc<-function(fromRaster, toRaster, extentVector)
+{
+  bounds<-extent(extentVector)
+  fromRaster<-crop(fromRaster, bounds)
+  toRaster<-crop(toRaster, bounds)
+  return(calc_flowArea(fromRaster, toRaster))
+}
+
+westUSA_2Cflow_matrix<-local_flowCalc(ecorast_now_mapped, ecorast_2C_mapped, c(-125, -105, 32, 49))
+westUSA_4Cflow_matrix<-local_flowCalc(ecorast_now_mapped, ecorast_4C_mapped, c(-125, -105, 32, 49))
+write.csv(westUSA_2Cflow_matrix, "Outputs/westUSA_ecorgn2C_flux.csv", row.names=F)
+write.csv(westUSA_4Cflow_matrix, "Outputs/westUSA_ecorgn4C_flux.csv", row.names=F)
 
 
 
