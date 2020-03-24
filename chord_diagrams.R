@@ -26,13 +26,21 @@ PA_biome_4C_chrdMatrices<-lapply(PA_biome_4C_chrdMatrices, as.data.frame)
 
 #ecoregion level biome chords
 ####################################
-for (i in c(2))
+for (i in c(1:5))
 {
   print(i)
+  plotChord_compare(global_biome_2C_chrdMatrices[[i]], global_biome_4C_chrdMatrices[[i]], 
+                    PA_biome_2C_chrdMatrices[[i]], PA_biome_4C_chrdMatrices[[i]],
+                    file=paste0("Figures/Chords/EcoLevelBiomeFull/", gsub(" ", "", as.character(LUT_biome$BIOME_NAME[i]), fixed = TRUE), ".pdf"), title=as.character(LUT_biome$BIOME_NAME[i]),
+                    biomeSub=T, trim=T)
     plotChord_compare(global_biome_2C_chrdMatrices[[i]], global_biome_4C_chrdMatrices[[i]], 
                              PA_biome_2C_chrdMatrices[[i]], PA_biome_4C_chrdMatrices[[i]],
-                             file=paste0("Figures/Chords/BiomeLevelFull/Biome_chord_", i, ".pdf"), title=as.character(LUT_biome$BIOME_NAME[i]),
-                            biomeSub=T, trim=T)
+                             file=paste0("Figures/Chords/EcoLevelBiomeMask/", gsub(" ", "", as.character(LUT_biome$BIOME_NAME[i]), fixed = TRUE), "_interCD.pdf"), title=as.character(LUT_biome$BIOME_NAME[i]),
+                            biomeSub=T, trim=T, mask=T, maskval="eco")
+    plotChord_compare(global_biome_2C_chrdMatrices[[i]], global_biome_4C_chrdMatrices[[i]], 
+                      PA_biome_2C_chrdMatrices[[i]], PA_biome_4C_chrdMatrices[[i]],
+                      file=paste0("Figures/Chords/EcoLevelBiomeMask/", gsub(" ", "", as.character(LUT_biome$BIOME_NAME[i]), fixed = TRUE), "_intraCD.pdf"), title=as.character(LUT_biome$BIOME_NAME[i]),
+                      biomeSub=T, trim=T, mask=T, maskval="biome")
 }
 
 setChordColor<-function(data, biomeSub=F)
@@ -49,7 +57,7 @@ setChordColor<-function(data, biomeSub=F)
   }
 }
 ###################################################################################################################################
-plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, title, textSize=1.5, text=F, biomeSub=F, trim=F)
+plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, title, textSize=1.5, text=T, biomeSub=F, trim=F, mask=F, maskval="biome")
 {
   #set colors (biomeSub indicated that we need to check for ecoregion colors in addition to biome)
   col2C<-setChordColor(matrix2C, biomeSub=biomeSub)
@@ -71,16 +79,31 @@ plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, ti
   circos.clear()
   circos.par(canvas.xlim=c(-1, 1), canvas.ylim=c(-1,1), start.degree = 90, 
              track.margin = c(-0.1, 0.1), gap.degree = 0, points.overflow.warning = FALSE)
-  chordPlot<-function(color, data, textSize, text, trim=F)
+  ##############################################################################################
+  chordPlot<-function(color, data)
   {
+    #change the matrix columns from eco/bio names to eco/bio ids
     data<-matNamesToNum(data)
+    #if we want to only label the sectors with >1% of total area, then create index to mask these
     if (trim)
-    {trimInd<-trimInd(data, 0.01)}
+    {trInd<-trimInd(data, 0.01)}
+    #make adjacency list
     data<-pipeToLongFormat(data)
+    #create vector defining transparency for each link
+    transpVec=vector(length=nrow(data))
+    transpVec[]=0.25
+    if (mask==T)
+    {
+      if (maskval=="biome") #set interbiome related links to high transparency
+      {transpVec[data$rowname %in% paste0("B", 1:16) | data$key %in% paste0("B", 1:16)] = 1}
+      if (maskval=="eco")  #set intrabiome related links to high transparency
+      {transpVec[data$rowname %notin% paste0("B", 1:16) & data$key %notin% paste0("B", 1:16)] = 1}
+    }
+    
     chordDiagram(x=data,
                  annotationTrack = "grid",
                  grid.col = color,
-                 transparency = 0.25,
+                 transparency = transpVec,
                  directional = 1,
                  direction.type = c("arrows", "diffHeight"),
                  diffHeight  = -0.04,
@@ -97,7 +120,7 @@ plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, ti
         if (trim==F)
                 {circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)} 
         else{
-          if (sector.name %in% trimInd)
+          if (sector.name %in% trInd)
                   {circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)}
         }
       }
@@ -107,38 +130,46 @@ plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, ti
   
   par(mar=c(1.2, 1, 1.2, 1))
   #plot
-  chordPlot(col2C, data=matrix2C, textSize=textSize, text=T, trim)
-  if (biomeSub)
-  {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
-  else
-  {title(main=paste0(title, "+2C"), cex=2)}
+  chordPlot(col2C, data=matrix2C)
+    if (biomeSub)
+    {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
+    else
+    {title(main=paste0(title, "+2C"), cex=2)}
   #plot
-  chordPlot(col4C, data=matrix4C, textSize=textSize, text=T, trim)
-  if (biomeSub)
-  {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
-  else
-  {title(main=paste0(title, " +4C"), cex=2)}
+  chordPlot(col4C, data=matrix4C)
+    if (biomeSub)
+    {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
+    else
+    {title(main=paste0(title, " +4C"), cex=2)}
   #PA chords
     #plot
-    chordPlot(col2Cpa, matrix2Cpa, textSize=textSize, text=T, trim)
-    if (biomeSub)
-    {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
-    else
-    {title(main=paste0("PA ", title, " +2C"), cex=2)}
+    chordPlot(col2Cpa, matrix2Cpa)
+      if (biomeSub)
+      {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
+      else
+      {title(main=paste0("PA ", title, " +2C"), cex=2)}
     #plot
-    chordPlot(col4Cpa, matrix4Cpa, textSize=textSize, text=T, trim)
-    if (biomeSub)
-    {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
-    else
-    {title(main=paste0("PA ", title, " +4C"), cex=2)}
-  
+    chordPlot(col4Cpa, matrix4Cpa)
+      if (biomeSub)
+      {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
+      else
+      {title(main=paste0("PA ", title, " +4C"), cex=2)}
+  #add legend
   plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
   if (biomeSub)
   {
-    print("hi")
     par(cex=1.2)
-    legeco=subset(LUT_plus[-848,], econame %in% c(colnames(matrix2C), colnames(matrix4C), colnames(matrix2Cpa), colnames(matrix4Cpa)))
-    legbio=subset(LUT_biome, BIOME_NAME %in% c(colnames(matrix2C), colnames(matrix4C), colnames(matrix2Cpa), colnames(matrix4Cpa)))
+    if (trim)
+    { #take ecoids above threshold
+      trimInv<-function(data){return(colnames(data)[colnames(data) %in% trimInd(data, 0.01)])}
+      names=c(trimInv(matrix2C), trimInv(matrix4C), trimInv(matrix2Cpa), trimInv(matrix4Cpa))
+      legeco=subset(LUT_plus[-848,], econame %in% names)
+      trimInv<-function(data){return(colnames(data)[colnames(data) %in% trimInd(data, 0.005)])}
+      names=c(trimInv(matrix2C), trimInv(matrix4C), trimInv(matrix2Cpa), trimInv(matrix4Cpa))
+      legbio=subset(LUT_biome, BIOME_NAME %in% names)
+      }
+    else{legeco=subset(LUT_plus[-848,], econame %in% c(colnames(matrix2C), colnames(matrix4C), colnames(matrix2Cpa), colnames(matrix4Cpa)))
+    legbio=subset(LUT_biome, BIOME_NAME %in% c(colnames(matrix2C), colnames(matrix4C), colnames(matrix2Cpa), colnames(matrix4Cpa)))}
     legend("topleft", legend=c(paste0(legeco$ECO_ID, ". ",legeco$econame), paste0("B", legbio$BIOME_ID, ". ", legbio$BIOME_NAME)), 
            ncol=3, fill=c(as.character(legeco$color), as.character(legbio$BIOME_COLOR)))
   }
