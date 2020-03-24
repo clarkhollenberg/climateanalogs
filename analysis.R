@@ -15,7 +15,7 @@ library(geosphere)
 library(IDPmisc)
 library(sp)
 library(dplyr)
-# library(sf)
+library(sf)
 # library(scales)
 # library(broom)
 # library(fasterize)
@@ -29,8 +29,9 @@ load(".RData")
 ########################################################################################################################
 # read in ecoregion shapefile from 2017 paper to get lookup table -skip and load LUT.csv
 ####################################################
-ecorgns<-st_read(dsn="Ecoregions2017shp",layer='Ecoregions2017')
+ecorgns<-st_read(dsn="Ecoregions2017",layer='Ecoregions2017')
 
+ecorgns<-readOGR(dsn="Ecoregions2017",layer='Ecoregions2017')
 
 ### Look up table (LUT) between econames and ECO_ID
 LUT<-data.frame(cbind(as.character(ecorgns$ECO_NAME), as.numeric(as.character(ecorgns$ECO_ID)), as.numeric(as.character(ecorgns$BIOME_NUM)), as.character(ecorgns$BIOME_NAME),
@@ -43,7 +44,7 @@ dummy<-data.frame(0:846)
 colnames(dummy)<- "ECO_ID"
 LUT<-merge(dummy, LUT, by="ECO_ID")
 rm(ecorgns, dummy)
-write.csv(LUT, "LUT.csv")
+write.csv(LUT, "Tables/LUT.csv", row.names=F)
 
 
 #convert polygons to raster (3 tiny ecoregions are lost in this step)
@@ -184,7 +185,7 @@ LUT[1, 'BIOME_NAME'] <- "Rock and Ice"
 LUT[1, 'BIOME_ID'] <- 15
 LUT[nrow(LUT) + 1,] = c(847,"No analog", 16, "No analog", "#000000", "#000000")
 LUT[nrow(LUT) + 1,] = c(848,"Insufficient data", 17, "Insufficient data", "#FFFFFF", "#FFFFFF")
-write.csv(LUT, "LUT_plus.csv")
+write.csv(LUT, "LUT_plus.csv", row.names = F)
 
 
 
@@ -284,25 +285,7 @@ dev.off()
 
 #by biome
 #####
-pdf(file="Perc_protected_comparison_graph_biome.pdf", 20, 8)
-par(mfrow=c(1,3))
-for (i in 1:14)
-{
-  vec <- vector()
-  df<-subset(perc_compare_df, BIOME_ID==i)
-  for (i in 1:nrow(df))
-  {
-    temp<-df$Mean_vote_perc[i]*100
-    temp<-as.integer(temp)
-    #choose the color for the ecoregion based on the value of the average % vote
-    vec <- c(vec, colorRampPalette(c('red', 'gray', 'blue'))(100)[temp])
-  }
-  plot(df$PA_perc_current, df$PA_perc_2C, xlim= c(0, 1), ylim= c(0, 1), xlab = 'Current proportion protected', 
-       ylab= '+2C proportion protected', col = vec, main=unique(df$BIOME_NAME))
-  legend("topleft", title = "% vote mean", legend = seq(from=1, to=0, by = -0.1), fill=colorRampPalette(c('blue', 'gray', 'red'))(11))
-  abline(0, 1, lty = 'dashed')
-}
-dev.off()
+
 #####
 
 #read in Dinerstein to compare

@@ -21,7 +21,7 @@ plotWColors<-function(rasterName, title, leg_x=NULL, leg_y=NULL, txtsize=NULL)
         plot(rasterName, col=color_palate_plot, main = title, legend=FALSE)
 }
 
-#function takes raster input and adjusts colors to match biome ids
+#function takes ecoregion raster input and adjusts colors to match biome ids
 plotByBiome<-function(rasterName, title)
 {
         rangeValues<-c((minValue(rasterName)+1):(maxValue(rasterName)+1))
@@ -29,6 +29,13 @@ plotByBiome<-function(rasterName, title)
         plot(rasterName, col=color_palate_plot, main = title, legend=FALSE)
 }
 
+#takes biome raster input
+plotBiomeRast<-function(rasterName, title)
+{
+        rangeValues<-c((minValue(rasterName)):(maxValue(rasterName)))
+        color_palate_plot<-as.character(unique(subset(LUT_plus[order(LUT_plus$BIOME_ID),], BIOME_ID %in% rangeValues)$biome_color))
+        plot(rasterName, col=color_palate_plot, main = title, legend=FALSE)
+}
 
 #function plots seperate color coded legend, showing ecoregions in two raster maps being compared
 plotLegend<-function(rasterName1, rasterName2, rasterName3, txtsize, columns)

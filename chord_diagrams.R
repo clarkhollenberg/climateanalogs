@@ -1,66 +1,85 @@
-
-
 # Libraries
 library(tidyverse)
 library(viridis)
 library(patchwork)
 library(circlize)
 library(chorddiag)  #devtools::install_github("mattflor/chorddiag")
-setwd("Documents/Analogs")
+source("~/Insync/clark.hollenberg@gmail.com/Google Drive/GitRepos/climateanalogs/func_matrixProcessing.R")
+source("~/Insync/clark.hollenberg@gmail.com/Google Drive/GitRepos/climateanalogs/chord_diagram_biome_chrdMat_gen.R")
 
+#biome master chord diagram
+#######################################
+biome_2C_flowMatrix<-read.csv("TransitionMat/biome_2C_flow_matrix.csv") %>% cleanInput(., biome=T)
+biome_4C_flowMatrix<-read.csv("TransitionMat/biome_4C_flow_matrix.csv") %>% cleanInput(., biome=T)
+PA_biome_2C_flowMatrix<-read.csv("TransitionMat/PA_bio_2C_flowMatrix.csv") %>% cleanInput(., biome=T)
+PA_biome_4C_flowMatrix<-read.csv("TransitionMat/PA_bio_4C_flowMatrix.csv") %>% cleanInput(., biome=T)
+plotChord_compare(biome_2C_flowMatrix, biome_4C_flowMatrix, PA_biome_2C_flowMatrix, PA_biome_4C_flowMatrix,
+                  file="Figures/Chords/biome_chord_comp.pdf", title="Biome flux from current to ")
 
+#creating chord diagrams at the ecoregion level for each biome
+#lists generated from source("~/Insync/clark.hollenberg@gmail.com/Google Drive/GitRepos/climateanalogs/chord_diagram_biome_chrdMat_gen.R")
+#########################################################
+global_biome_2C_chrdMatrices<-lapply(global_biome_2C_chrdMatrices, as.data.frame)
+global_biome_4C_chrdMatrices<-lapply(global_biome_4C_chrdMatrices, as.data.frame)
+PA_biome_2C_chrdMatrices<-lapply(PA_biome_2C_chrdMatrices, as.data.frame)
+PA_biome_4C_chrdMatrices<-lapply(PA_biome_4C_chrdMatrices, as.data.frame)
 
-cleanSubsetInput<-function(data)
+#ecoregion level biome chords
+####################################
+for (i in c(2))
 {
-  colnames(data)<-LUT_plus$econame[-849]  #take econames minus the insuff.data
-  rownames(data)<-colnames(data)
-  data[is.na(data)]<-0
-  cols<-colSums(data)
-  rows<-rowSums(data)
-  #remove columns and rows with where ecoregion is not involved in giving or receiving area
-  data[, (cols==0 & rows==0)]<-NULL  
-  data<-data[colnames(data), ]  #make the matrix symmetrical
-  return(data)
+  print(i)
+    plotChord_compare(global_biome_2C_chrdMatrices[[i]], global_biome_4C_chrdMatrices[[i]], 
+                             PA_biome_2C_chrdMatrices[[i]], PA_biome_4C_chrdMatrices[[i]],
+                             file=paste0("Figures/Chords/BiomeLevelFull/Biome_chord_", i, ".pdf"), title=as.character(LUT_biome$BIOME_NAME[i]),
+                            biomeSub=T, trim=T)
 }
 
-#subset ecoregion plots
-westUSA_2Cflow_matrix<-read.csv("Outputs/westUSA_ecorgn2C_flux.csv") %>% cleanSubsetInput() %>% pipeToLongFormat()
-westUSA_4Cflow_matrix<-read.csv("Outputs/westUSA_ecorgn4C_flux.csv") %>% cleanSubsetInput() %>% pipeToLongFormat()
-
-plotChord_compare<-function(matrix2C, matrix4C, file)
+setChordColor<-function(data, biomeSub=F)
 {
-  col2C<-subset(LUT_plus, econame %in% matrix2C$rowname)$color
-  col4C<-subset(LUT_plus, econame %in% matrix4C$rowname)$color
-  pdf(file, 20, 12)
-  circos.clear()
-  par(mfrow=c(1, 2), mar=c(2, 1, 2, 1))
-  circos.par(canvas.xlim=c(-1.3, 1.3), canvas.ylim=c(-1.25, 1.25), start.degree = 90, 
-             track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
-  # Plot 2C fluxes
-  chordDiagram(x=matrix2C,
-               annotationTrack = "grid",
-               grid.col = col2C,
-               transparency = 0.25,
-               directional = 1,
-               direction.type = c("arrows", "diffHeight"),
-               diffHeight  = -0.04,
-               link.arr.type = "big.arrow",
-               link.sort = TRUE,
-               link.largest.ontop = TRUE)
+  if (biomeSub)
+  {
+    #colors for ecoregions and add those for biomes
+    return(c(as.character(subset(LUT_plus, econame %in% colnames(data)[colnames(data)!="No analog"])$color), 
+             as.character(subset(LUT_biome, BIOME_NAME %in% colnames(data))$BIOME_COLOR)))
+  }
+  else
+  {
+    return(as.character(subset(LUT_biome, BIOME_NAME %in% colnames(data))$BIOME_COLOR))
+  }
+}
+###################################################################################################################################
+plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, title, textSize=1.5, text=F, biomeSub=F, trim=F)
+{
+  #set colors (biomeSub indicated that we need to check for ecoregion colors in addition to biome)
+  col2C<-setChordColor(matrix2C, biomeSub=biomeSub)
+  col4C<-setChordColor(matrix4C, biomeSub=biomeSub)
+  col2Cpa<-setChordColor(matrix2Cpa,  biomeSub=biomeSub)
+  col4Cpa<-setChordColor(matrix4Cpa,  biomeSub=biomeSub)
   
-    circos.trackPlotRegion(track.index = 1, panel.fun = function(x, y) {
-      xlim = get.cell.meta.data("xlim")
-      ylim = get.cell.meta.data("ylim")
-      sector.name = get.cell.meta.data("sector.index")
-      circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.8)
-      circos.axis(h = "top", labels=F, major.tick.percentage = 0.5, sector.index = sector.name, track.index = 1)
-    }, bg.border = NA)
-    title(main="WestUS Shifts from Current to +2C")
-    #####################
-    # plot 4C fluxes
-    chordDiagram(x=matrix4C,
+  pdf(file, 20, 20)
+  mat=matrix(c(1, 2, 3, 4, 5, 5), nrow=3, ncol=2, byrow=T)
+  if (biomeSub)
+  {par(cex.main=2)
+    layout(mat, widths=c(1, 1), heights = c(4, 4, 3.4))}
+  else
+  {
+    par(cex.main=2)
+    layout(mat, widths=c(1, 1), heights = c(4, 4, 1))
+  }
+  
+  circos.clear()
+  circos.par(canvas.xlim=c(-1, 1), canvas.ylim=c(-1,1), start.degree = 90, 
+             track.margin = c(-0.1, 0.1), gap.degree = 0, points.overflow.warning = FALSE)
+  chordPlot<-function(color, data, textSize, text, trim=F)
+  {
+    data<-matNamesToNum(data)
+    if (trim)
+    {trimInd<-trimInd(data, 0.01)}
+    data<-pipeToLongFormat(data)
+    chordDiagram(x=data,
                  annotationTrack = "grid",
-                 grid.col = col4C,
+                 grid.col = color,
                  transparency = 0.25,
                  directional = 1,
                  direction.type = c("arrows", "diffHeight"),
@@ -73,107 +92,60 @@ plotChord_compare<-function(matrix2C, matrix4C, file)
       xlim = get.cell.meta.data("xlim")
       ylim = get.cell.meta.data("ylim")
       sector.name = get.cell.meta.data("sector.index")
-      circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.8)
-      circos.axis(h = "top", labels=F, major.tick.percentage = 0.5, sector.index = sector.name, track.index = 1)
+      if (text)
+      { 
+        if (trim==F)
+                {circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)} 
+        else{
+          if (sector.name %in% trimInd)
+                  {circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)}
+        }
+      }
+      # circos.axis(h = "top", labels=F, major.tick.percentage = 10, sector.index = sector.name, track.index = 1)
     }, bg.border = NA)
-    title(main="WestUS Shifts from Current to +4C")
-    
-    dev.off()
-}
-
-plotChord_compare(westUSA_2Cflow_matrix, westUSA_4Cflow_matrix, "Figures/westUSA_chord.pdf")
-
-
-
-#Global plots by biome
-biomenames<-LUT_biome[order(LUT_biome$BIOME_ID), ]
-biomenames<-biomenames[-c(9, 14, 15, 17), ]  #remove insufficient data and water biomes
-biomenames$BIOME_NAME<-as.character(biomenames$BIOME_NAME)  #change from factor to character, so we can add line breaks to long titles
-biomenames$BIOME_NAME[c(1:4, 7, 8, 9, 11)]<-c("Tropical & Subtropical\n Moist Broadleaf Forests", "Tropical & Subtropical Dry\n Broadleaf Forests", "	Tropical & Subtropical\n Coniferous Forests",
-                                      "Temperate\n Broadleaf &\n Mixed Forests", 	"Tropical & Subtropical Grasslands,\n Savannas & Shrublands", 	
-                                      "Temperate Grasslands,\n Savannas & Shrublands", "	Montane Grasslands\n & Shrublands", "Mediterranean Forests,\n Woodlands & Scrub")
-# color palette
-biomeColor <- as.character(biomenames$BIOME_COLOR)
-
-
-#preprocess input flow matrix to remove entries and add biome names
-formatBiomeInput<-function(data, namesDF)
-{
-  data['X']<-NULL
-  #remove mangroves,flooded grassland, and rock and ice biomes
-  data<-data[-c(9, 14, 15)]
-  data<-data[-c(9, 14, 15), ]
+  }
   
-  colnames(data)<-namesDF$BIOME_NAME
-  rownames(data)<-colnames(data)
-  return(data)
- }
-
-#change from adjacency matrix to adjacency list
-pipeToLongFormat<-function(data)
-{
-  data_long <- data %>%
-    rownames_to_column %>%
-    gather(key = 'key', value = 'value', -rowname)
-  data_long[is.na(data_long)]<-0
-  return(data_long)
+  par(mar=c(1.2, 1, 1.2, 1))
+  #plot
+  chordPlot(col2C, data=matrix2C, textSize=textSize, text=T, trim)
+  if (biomeSub)
+  {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
+  else
+  {title(main=paste0(title, "+2C"), cex=2)}
+  #plot
+  chordPlot(col4C, data=matrix4C, textSize=textSize, text=T, trim)
+  if (biomeSub)
+  {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
+  else
+  {title(main=paste0(title, " +4C"), cex=2)}
+  #PA chords
+    #plot
+    chordPlot(col2Cpa, matrix2Cpa, textSize=textSize, text=T, trim)
+    if (biomeSub)
+    {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
+    else
+    {title(main=paste0("PA ", title, " +2C"), cex=2)}
+    #plot
+    chordPlot(col4Cpa, matrix4Cpa, textSize=textSize, text=T, trim)
+    if (biomeSub)
+    {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
+    else
+    {title(main=paste0("PA ", title, " +4C"), cex=2)}
+  
+  plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+  if (biomeSub)
+  {
+    print("hi")
+    par(cex=1.2)
+    legeco=subset(LUT_plus[-848,], econame %in% c(colnames(matrix2C), colnames(matrix4C), colnames(matrix2Cpa), colnames(matrix4Cpa)))
+    legbio=subset(LUT_biome, BIOME_NAME %in% c(colnames(matrix2C), colnames(matrix4C), colnames(matrix2Cpa), colnames(matrix4Cpa)))
+    legend("topleft", legend=c(paste0(legeco$ECO_ID, ". ",legeco$econame), paste0("B", legbio$BIOME_ID, ". ", legbio$BIOME_NAME)), 
+           ncol=3, fill=c(as.character(legeco$color), as.character(legbio$BIOME_COLOR)))
+  }
+  else
+  {
+    leg=lapply(colnames(matrix2C), FUN=function(x){paste0("B", subset(LUT_biome, BIOME_NAME==x)$BIOME_ID, ". ", x)})
+    legend("topleft", legend=leg, ncol=3, fill=as.character(subset(LUT_biome, BIOME_NAME %in% colnames(matrix2C))$BIOME_COLOR), cex=1.95)
+  }
+  dev.off()
 }
-
-# Load datasets
-biomedata_2C <- read.csv("Outputs/biome_2C_flow_matrix.csv") %>% formatBiomeInput(., biomenames) %>% pipeToLongFormat()
-biomedata_4C <- read.csv("Outputs/biome_4C_flow_matrix.csv") %>% formatBiomeInput(., biomenames) %>% pipeToLongFormat()
-
-# plot biome chord diagrams
-####################################################################
-pdf("Chord_diag_biomes.pdf", 20, 12)
-circos.clear()
-par(mfrow=c(1, 2), mar=c(2, 1, 2, 1))
-circos.par(canvas.xlim=c(-1.3, 1.3), canvas.ylim=c(-1.25, 1.25), start.degree = 90, 
-           track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
-# Plot 2C fluxes
-chordDiagram(x=biomedata_2C,
-  annotationTrack = "grid",
-  grid.col = mycolor,
-  transparency = 0.25,
-  directional = 1,
-  direction.type = c("arrows", "diffHeight"),
-  diffHeight  = -0.04,
-  link.arr.type = "big.arrow",
-  link.sort = TRUE,
-  link.largest.ontop = TRUE)
-
-circos.trackPlotRegion(track.index = 1, panel.fun = function(x, y) {
-  xlim = get.cell.meta.data("xlim")
-  ylim = get.cell.meta.data("ylim")
-  sector.name = get.cell.meta.data("sector.index")
-  circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.8)
-  circos.axis(h = "top", labels=F, major.tick.percentage = 0.5, sector.index = sector.name, track.index = 1)
-}, bg.border = NA)
-title(main="Biome Shifts from Current to +2C")
-#####################
-# plot 4C fluxes
-chordDiagram(x=biomedata_4C,
-             annotationTrack = "grid",
-             grid.col = mycolor,
-             transparency = 0.25,
-             directional = 1,
-             direction.type = c("arrows", "diffHeight"),
-             diffHeight  = -0.04,
-             link.arr.type = "big.arrow",
-             link.sort = TRUE,
-             link.largest.ontop = TRUE)
-
-circos.trackPlotRegion(track.index = 1, panel.fun = function(x, y) {
-  xlim = get.cell.meta.data("xlim")
-  ylim = get.cell.meta.data("ylim")
-  sector.name = get.cell.meta.data("sector.index")
-  circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.8)
-  circos.axis(h = "top", labels=F, major.tick.percentage = 0.5, sector.index = sector.name, track.index = 1)
-}, bg.border = NA)
-title(main="Biome Shifts from Current to +4C")
-
-dev.off()
-
-
-
-

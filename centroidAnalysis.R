@@ -30,7 +30,6 @@ centroidCalcBiome<-function(ecorgn_rast, filename)
   
   for (i in 1:14)
   {
-    
     ecobioVector<-subset(sorted_LUT, sorted_LUT$BIOME_ID==i, select=ECO_ID)
     xy_i<-data.frame(xyFromCell(ecorgn_rast, which(ecorgn_rast[] %in% ecobioVector$ECO_ID)))
     xy_N<-subset(xy_i, y>0)
