@@ -1,0 +1,17 @@
+analysis.R
+
+MTA_calcs.R - calculate MTA (mean target achievement) for ecoregions, biomes, and globally
+
+MTA_plotting.R - draw curves showing distribution of % protected (in order to understand MTA differences by biome
+
+ecos_per_PA.R - calculate num_ecos per PA (on Cortana)
+
+state_and_transition_tables.R - code to generate state (% of globe/PA in each state) and transition (area transfer) tables for biomes and ecoregions
+
+ShinyMap.R - Shiny visualization
+
+violinplots.R - violin plot generation showing distribution of %protected by biome
+
+markovExplorationTransMat.R - test steadystates for Markov transMat - not successful
+
+centroidAnalysis.R - calculate centroids for each ecoregion - likely not useful
