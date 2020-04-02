@@ -4,8 +4,9 @@ library(viridis)
 library(patchwork)
 library(circlize)
 library(chorddiag)  #devtools::install_github("mattflor/chorddiag")
-source("~/Insync/clark.hollenberg@gmail.com/Google Drive/GitRepos/climateanalogs/func_matrixProcessing.R")
-source("~/Insync/clark.hollenberg@gmail.com/Google Drive/GitRepos/climateanalogs/chord_diagram_biome_chrdMat_gen.R")
+source("../GitRepos/climateanalogs/func_matrixProcessing.R")
+source("../GitRepos/climateanalogs/by_biome_chord_matrix_gen.R")
+source("../GitRepos/climateanalogs/by_biome_chord_matrix_gen_mta.R")
 
 #biome master chord diagram
 #######################################
@@ -14,7 +15,7 @@ biome_4C_flowMatrix<-read.csv("TransitionMat/biome_4C_flow_matrix.csv") %>% clea
 PA_biome_2C_flowMatrix<-read.csv("TransitionMat/PA_bio_2C_flowMatrix.csv") %>% cleanInput(., biome=T)
 PA_biome_4C_flowMatrix<-read.csv("TransitionMat/PA_bio_4C_flowMatrix.csv") %>% cleanInput(., biome=T)
 plotChord_compare(biome_2C_flowMatrix, biome_4C_flowMatrix, PA_biome_2C_flowMatrix, PA_biome_4C_flowMatrix,
-                  file="Figures/Chords/biome_chord_comp.pdf", title="Biome flux from current to ")
+                  file="Figures/Chords/biome_chord_diag.pdf", title="Biome flux from current to ", textSize = 2.5)
 
 #creating chord diagrams at the ecoregion level for each biome
 #lists generated from source("~/Insync/clark.hollenberg@gmail.com/Google Drive/GitRepos/climateanalogs/chord_diagram_biome_chrdMat_gen.R")
@@ -72,7 +73,7 @@ plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, ti
     layout(mat, widths=c(1, 1), heights = c(4, 4, 3.4))}
   else
   {
-    par(cex.main=2)
+    par(cex.main=3.6)
     layout(mat, widths=c(1, 1), heights = c(4, 4, 1))
   }
   
@@ -118,10 +119,10 @@ plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, ti
       if (text)
       { 
         if (trim==F)
-                {circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)} 
+                {circos.text(mean(xlim), ylim[1] + 2, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)} 
         else{
           if (sector.name %in% trInd)
-                  {circos.text(mean(xlim), ylim[1] + 1.5, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)}
+                  {circos.text(mean(xlim), ylim[1] + 2, sector.name, facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=textSize)}
         }
       }
       # circos.axis(h = "top", labels=F, major.tick.percentage = 10, sector.index = sector.name, track.index = 1)
@@ -134,27 +135,27 @@ plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, ti
     if (biomeSub)
     {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
     else
-    {title(main=paste0(title, "+2C"), cex=2)}
+    {title(main="a.", line=-2, adj=0)}
   #plot
   chordPlot(col4C, data=matrix4C)
     if (biomeSub)
     {title(main=paste0(as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
     else
-    {title(main=paste0(title, " +4C"), cex=2)}
+    {title(main="b.", line=-2, adj=0)}
   #PA chords
     #plot
     chordPlot(col2Cpa, matrix2Cpa)
       if (biomeSub)
       {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +2C"))}
       else
-      {title(main=paste0("PA ", title, " +2C"), cex=2)}
+      {title(main="c.", line=-2, adj=0)}
     #plot
     chordPlot(col4Cpa, matrix4Cpa)
       if (biomeSub)
       {title(main=paste0("PA ", as.character(LUT_biome$BIOME_NAME[i]), " +4C"))}
       else
-      {title(main=paste0("PA ", title, " +4C"), cex=2)}
-  #add legend
+      {title(main="d.", line=-2, adj=0)}
+    #add legend
   plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
   if (biomeSub)
   {
@@ -175,6 +176,7 @@ plotChord_compare<-function(matrix2C, matrix4C, matrix2Cpa, matrix4Cpa, file, ti
   }
   else
   {
+    par(cex=0.66)
     leg=lapply(colnames(matrix2C), FUN=function(x){paste0("B", subset(LUT_biome, BIOME_NAME==x)$BIOME_ID, ". ", x)})
     legend("topleft", legend=leg, ncol=3, fill=as.character(subset(LUT_biome, BIOME_NAME %in% colnames(matrix2C))$BIOME_COLOR), cex=1.95)
   }

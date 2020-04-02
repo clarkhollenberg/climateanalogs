@@ -4,7 +4,7 @@ library(dplyr)
 library(scales)
 
 setwd("~/ClimateAnalogs/analysis/Terraclimate") #laptop
-setwd("~/Documents/Analogs/ClimateSpace") 
+setwd("ClimateSpace") 
 
 #load in Terraclimate data -skip
 #####
@@ -34,14 +34,14 @@ def.av<-raster("avedef.tif")
 #stack and convert to df
 meanRast<-brick(tmax.av, tmin.av, aet.av, def.av)
 #mask areas with insufficient data from analysis in current PCA (to remove rock and ice, etc)
-jmask<-raster("/home/clark/Documents/Analogs/InRasters/johnmask.nc")
+jmask<-raster("Rasters/johnmask.nc")
 meanRast_mask<-mask(meanRast, jmask, maskvalue=1)  #to remove insufficient data areas (mostly ice and the amazon)
 means.df<-as.data.frame(meanRast_mask, na.rm = TRUE)
 colnames(means.df)<-c("tmax", "tmin", "aet", "def")
 write.csv(means.df, "climateMeans_wout_NA.csv", row.names=F)
 
 #Load in averages and subsample cells w/out NA
-means.df<-read.csv("climateMeans_wout_NA.csv")
+means.df<-read.csv("ClimateSpace/Tables/climateMeans_wout_NA.csv")
 means_sub.df<-means.df[sample(nrow(means.df), 500000), ]
 
 #run PCA
@@ -54,7 +54,7 @@ PCA <- prcomp(means_sub.df, center=T, scale=T, rank=2)
 
 #project into PC space and assign ECOIDS
 ###############################
-ecorast_now <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_now.tif")
+ecorast_now <- raster("Rasters/ecorast_now.tif")
 #note using rasters w/ no analog & insufficient data cells assigned to 847 and 848 respectively
 ecorast_2C_mapped <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_2C_mapped.tif") 
 ecorast_4C_mapped <- raster("/home/clark/Documents/Analogs/InRasters/ecorast_4C_mapped.tif")
@@ -64,13 +64,15 @@ LUT_plus<-read.csv("LUT.csv")
 #functions
 extract_ecoids<-function(inputMeanRast, ecorast)
 {
+  PA_bin[is.na(PA_bin)]=0
   df<-as.data.frame(inputMeanRast) #this time we'll keep the NAs to preserve cell number (not using means.df)
   df$cell_num<-c(1:(4320*8640))
   df<-df[!is.na(df[,1]), ] #remove NA (by checking the first column
   df$ECO_ID<-extract(ecorast, df$cell_num) #returns current eco_ids
+  df$PA<-extract(PA_bin, df$cell_num)
   df<-df[!is.na(df$ECO_ID), ] #Remove the few eco_ids with NA
-  colnames(df)<-c("tmax", "tmin", "aet", "def", "ECO_ID")
-  return(fullmean.df)
+  colnames(df)<-c("tmax", "tmin", "aet", "def", "cell_num", "ECO_ID", "PA")
+  return(df)
 }
 
 meanByEco<-function(data, indexCol)
@@ -92,10 +94,11 @@ meanByEco<-function(data, indexCol)
 projectCSpace<-function(inputDF)
 {
   input_mask<-inputDF
-  input_mask['ECO_ID']<-NULL
+  input_mask[c('ECO_ID', 'PA')]<-NULL
   proj.df<-as.data.frame(predict(PCA,input_mask))  #don't pass the ECO_ID column to PCA
   proj.df$PC2<-proj.df$PC2*-1  #flip coordinate sign for more intuitive plotting
   proj.df$ECO_ID<-inputDF$ECO_ID  #add the ecoids back in for plotting purposes
+  proj.df$PA<-inputDF$PA
   proj.df<-merge(proj.df, LUT_plus, by="ECO_ID") #merge with LUT to get colors etc
   return(proj.df)
 }
@@ -103,14 +106,17 @@ projectCSpace<-function(inputDF)
 
 #assign ecoids from climate scenarios to global climate average dataframe
 ecomatched_now.df<- extract_ecoids(meanRast_mask, ecorast_now)
-write.csv(ecomatched_now.df, "Tables/assignedEcoids_now.csv", row.names = F)
+ecomatched_now.df$cell_num<-NULL
+write.csv(ecomatched_now.df, "ClimateSpace/Tables/assignedEcoids_now.csv", row.names = F)
+ecomatched_now.df<-read.csv("ClimateSpace/Tables/assignedEcoids_now.csv")
+
 ##Need to use a different meanRast input for the 2C and 4C climate scenarios
 ecomatched_2C.df<- extract_ecoids(meanRast_mask, ecorast_2C_mapped)
 ecomatched_4C.df<- extract_ecoids(meanRast_mask, ecorast_4C_mapped)
 
 #project all cells into climate space and use this as framework for further analysis
 now_all.proj<-projectCSpace(ecomatched_now.df)
-write.csv(now_all.proj, "Tables/now.proj.csv", row.names = F)
+write.csv(now_all.proj, "ClimateSpace/Tables/now.proj.csv", row.names = F)
 
 
 ###########################
@@ -119,25 +125,29 @@ write.csv(now_all.proj, "Tables/now.proj.csv", row.names = F)
 #average climate variables by ecoregion
 aves_by_eco_now.df<-meanByEco(ecomatched_now.df, ecomatched_now.df$ECO_ID)
 write.csv(aves_by_eco_now.df, "Tables/climateMeansbyEco_nowDF.csv", row.names = F)
+
 #need to use different input
 aves_by_eco_2C.df<-meanByEco(ecomatched_2C.df, ecomatched_2C.df$ECO_ID) 
 aves_by_eco_4C.df<-meanByEco(ecomatched_4C.df, ecomatched_4C.df$ECO_ID) 
 
 
-
+pa_all.proj<-subset(now_all.proj, PA==1)
 
 
 #plotting and visualization
 ##############################
 
-now_sub.proj<- now_all.proj[sample(1:nrow(ecomatched_now.df), 15000), ]
-now_bigsub.proj<- now_all.proj[sample(1:nrow(ecomatched_now.df), 50000), ]
-pdf("Figures/current_climate_space_million.pdf", 12, 8)
-plot(now_bigsub.proj$PC1, now_bigsub.proj$PC2, col=alpha(as.character(now_bigsub.proj$color), 0.7), pch=16, xlab="PC1 (approx. low to high energy)",
-     ylab="PC2 (approx low to high water)", main="Half million cells in current Climate Space")
+now_sub.proj<- now_all.proj[sample(1:nrow(now_all.proj), 100000), ]
+pa_sub.proj<-pa_all.proj[sample(1:nrow(pa_all.proj), 20000), ]
+pdf("Figures/current_PA_comparison.pdf", 18, 8)
+par(mfrow=c(1,2))
+plot(now_sub.proj$PC1, now_sub.proj$PC2, col=alpha(as.character(now_sub.proj$color), 0.7), pch=16, xlab="PC1 (approx. low to high energy)",
+     ylab="PC2 (approx low to high water)", main="Subset Global Climate Space")
+plot(pa_sub.proj$PC1, pa_sub.proj$PC2, col=alpha(as.character(pa_sub.proj$color), 0.7), pch=16, xlab="PC1 (approx. low to high energy)",
+     ylab="PC2 (approx low to high water)", main="Subset PA Climate Space")
 dev.off()
 
-pdf("Figures/current_climate_space_subsample.pdf", 12, 8)
+pdf("ClimateSpace/Figures/current_climate_space_subsample.pdf", 12, 8)
 plot(now_sub.proj$PC1, now_sub.proj$PC2, col=alpha(as.character(now_sub.proj$color), 0.8), pch=16, xlab="PC1 (approx. low to high energy)",
      ylab="PC2 (approx low to high water)", main="10000 cells in current Climate Space")
 dev.off()

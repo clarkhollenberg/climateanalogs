@@ -53,7 +53,7 @@ centroidCalcBiome<-function(ecorgn_rast, filename)
   return(centr)
 }
 
-centr_now <- centroidCalc(ecorgn_rast_now, "Current_ecoregion_centroids.csv")
+centr_now <- centroidCalc(ecorgn_rast_now, "ecoregion_centr_now.csv")
 centr_now <- data.frame(centr_now)
 rownames(centr_now) <- c()
 colnames(centr_now) <- c("ECO_ID", "x_now", "y_now")
